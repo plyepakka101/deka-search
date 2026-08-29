@@ -1,0 +1,59 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ImportBatch {
+  id           String     @id @default(cuid())
+  fileName     String
+  importedAt   DateTime   @default(now())
+  createdCount Int        @default(0)
+  updatedCount Int        @default(0)
+  decisions    Decision[]
+}
+
+model Decision {
+  id                String   @id @default(cuid())
+  decisionNumber    String   @unique // เลขที่คำพิพากษาศาลฎีกา (e.g., "1234/2565")
+  decisionYear      Int?     // ปี พ.ศ. ของคำพิพากษา
+  caseNumberSupreme String?  // หมายเลขคดีคำของศาลฎีกา
+  caseNumberLower   String?  // หมายเลขคดีคำและแดงของศาลชั้นต้น
+  parties           String?  // ชื่อคู่ความ
+  law               String?  // ชื่อกฎหมาย
+  shortSummary      String?  // ย่อสั้น
+  longSummary       String?  // ย่อยาว
+  source            String?  // แหล่งที่มา
+  judge             String?  // ชื่อองค์คณะ
+  court             String?  // ศาลชั้นต้นและศาลอุทธรณ์ที่ตัดสิน
+  department        String?  // แผนก
+  notes             String?  // หมายเหตุ
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  importBatchId     String?
+  importBatch       ImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
+
+  @@index([decisionYear])
+  @@index([law])
+}
+
+model LawBook {
+  id           String   @id @default(cuid())
+  name         String
+  abbreviation String
+  content      String
+  color        String
+  description  String?
+  sourceUrl    String?
+  lastUpdated  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}

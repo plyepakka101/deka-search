@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-inter: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-thai: var(--font-noto-sans-thai), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  
+  --color-primary: #0f172a;
+  --color-primary-foreground: #ffffff;
+  --color-accent: #c29b57; /* Gold/Brass accent for a premium legal look */
+}
+
+@layer base {
+  body {
+    @apply font-thai bg-slate-50 text-slate-900 antialiased;
+  }
+}

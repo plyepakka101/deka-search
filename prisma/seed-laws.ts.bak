@@ -1,0 +1,43 @@
+import { PrismaClient } from '@prisma/client';
+import { BOOKS } from '../src/components/law-mate/services/dataService';
+
+const prisma = new PrismaClient();
+
+async function main() {
+  console.log('Seeding laws to database...');
+
+  for (const book of BOOKS) {
+    const existing = await prisma.lawBook.findFirst({
+      where: { name: book.name }
+    });
+
+    if (!existing) {
+      console.log(`Inserting ${book.name}...`);
+      await prisma.lawBook.create({
+        data: {
+          id: book.id,
+          name: book.name,
+          abbreviation: book.abbreviation,
+          content: book.content,
+          color: book.color,
+          description: book.description,
+          sourceUrl: book.sourceUrl,
+          lastUpdated: book.lastUpdated,
+        }
+      });
+    } else {
+      console.log(`${book.name} already exists. Skipping.`);
+    }
+  }
+  
+  console.log('Done seeding laws.');
+}
+
+main()
+  .catch(e => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

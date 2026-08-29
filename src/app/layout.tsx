@@ -1,0 +1,41 @@
+import type { Metadata } from "next";
+import { Inter, Noto_Sans_Thai } from "next/font/google";
+import "./globals.css";
+
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+});
+
+const notoSansThai = Noto_Sans_Thai({
+  variable: "--font-noto-sans-thai",
+  subsets: ["thai", "latin"],
+  weight: ["300", "400", "500", "600", "700"],
+});
+
+export const metadata: Metadata = {
+  title: "Deka Search | ระบบสืบค้นคำพิพากษาศาลฎีกา",
+  description: "ระบบสืบค้นคำพิพากษา คำสั่งคำร้องและคำวินิจฉัยศาลฎีกา",
+  manifest: "/manifest.json",
+  themeColor: "#0ea5e9",
+};
+
+import Navbar from "@/components/Navbar";
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html
+      lang="th"
+      className={`${inter.variable} ${notoSansThai.variable} h-full antialiased`}
+    >
+      <body className="min-h-full flex flex-col font-thai bg-slate-50 text-slate-900">
+        <Navbar />
+        {children}
+      </body>
+    </html>
+  );
+}

@@ -1,0 +1,50 @@
+					<span>ก</span>
+				</button>
+								<div id="show-result-item" class="hidden-item">
+					<div class="arrow-up"></div>
+					<div class="display-result-item">
+						<ul>
+							<li>
+								<label class="display-deka_no ">เลขที่คำพิพากษาศาลฎีกา</label>
+							</li>
+							
+						<li><input type="checkbox" id="show_item_litigant" class="result-item css-checkbox med" checked /><label for="show_item_litigant" class="css-label med elegant">ชื่อคู่ความ</label></li><li><input type="checkbox" id="show_item_law" class="result-item css-checkbox med" checked /><label for="show_item_law" class="css-label med elegant">ชื่อกฎหมาย</label></li><li><input type="checkbox" id="show_item_short_text" class="result-item css-checkbox med" checked /><label for="show_item_short_text" class="css-label med elegant">ย่อสั้น</label></li><li><input type="checkbox" id="show_item_long_text" class="result-item css-checkbox med"  /><label for="show_item_long_text" class="css-label med elegant">ย่อยาว</label></li><li><input type="checkbox" id="show_item_source" class="result-item css-checkbox med" checked /><label for="show_item_source" class="css-label med elegant">แหล่งที่มา</label></li><li><input type="checkbox" id="show_item_judge" class="result-item css-checkbox med" checked /><label for="show_item_judge" class="css-label med elegant">ชื่อองค์คณะ</label></li><li><input type="checkbox" id="show_item_primarycourt" class="result-item css-checkbox med" checked /><label for="show_item_primarycourt" class="css-label med elegant">ศาลชั้นต้นและศาลอุทธรณ์ที่ตัดสิน</label></li><li><input type="checkbox" id="show_item_department" class="result-item css-checkbox med"  /><label for="show_item_department" class="css-label med elegant">แผนก</label></li><li><input type="checkbox" id="show_item_primartcourt_deka_no" class="result-item css-checkbox med"  /><label for="show_item_primartcourt_deka_no" class="css-label med elegant">หมายเลขคดีคำและหมายเลขคดีแดงของศาลชั้นต้น</label></li><li><input type="checkbox" id="show_item_remark" class="result-item css-checkbox med"  /><label for="show_item_remark" class="css-label med elegant">หมายเหตุ</label></li>						</ul>
+						
+						<hr class="section-heading-spacer" />
+						<div>
+							<button id="choose_show_item_all" class="btn btn-primary">เลือกทั้งหมด</button>
+							<button id="unchoose_show_item_all" class="btn btn-primary">ไม่เลือกทั้งหมด</button>
+							<button id="close_show_display_item" class="btn btn-success">ปิดหน้าต่าง</button>
+						</div>
+					</div>
+				</div>
+
+				<ul>
+					<li>
+						<button id="choose_all_deka" class="btn btn-default">
+							<span class="glyphicon glyphicon-check"></span> เลือกทั้งหมด
+							<input type="hidden" id="choose_all_deka_value" value="0" />
+						</button>
+						<button id="show_condition" class="btn btn-default" data-toggle="manual" data-placement="bottom" data-popover-content="#search_condition">
+							<span class="glyphicon glyphicon-eye-open"></span> แสดงคำค้น
+						</button>
+						
+						<button id="btn-print-result-item" class="btn btn-default">
+							<span class="glyphicon glyphicon-th-list"></span> กำหนดรูปแบบการพิมพ์
+						</button>
+						<div id="print-result-item" class="hidden-item">
+							<div class="arrow-up"></div>
+							<div class="display-result-item">
+								<ul>
+							<li><input type="checkbox" id="print_item_deka_no" class="print-item css-checkbox med" checked /><label for="print_item_deka_no" class="css-label med elegant">เลขที่คำพิพากษาศาลฎีกา</label></li><li><input type="checkbox" id="print_item_litigant" class="print-item css-checkbox med" checked /><label for="print_item_litigant" class="css-label med elegant">ชื่อคู่ความ</label></li><li><input type="checkbox" id="print_item_law" class="print-item css-checkbox med" checked /><label for="print_item_law" class="css-label med elegant">ชื่อกฎหมาย</label></li><li><input type="checkbox" id="print_item_short_text" class="print-item css-checkbox med" checked /><label for="print_item_short_text" class="css-label med elegant">ย่อสั้น</label></li><li><input type="checkbox" id="print_item_long_text" class="print-item css-checkbox med" checked /><label for="print_item_long_text" class="css-label med elegant">ย่อยาว</label></li><li><input type="checkbox" id="print_item_source" class="print-item css-checkbox med" checked /><label for="print_item_source" class="css-label med elegant">แหล่งที่มา</label></li><li><input type="checkbox" id="print_item_judge" class="print-item css-checkbox med" checked /><label for="print_item_judge" class="css-label med elegant">ชื่อองค์คณะ</label></li><li><input type="checkbox" id="print_item_primarycourt" class="print-item css-checkbox med" checked /><label for="print_item_primarycourt" class="css-label med elegant">ศาลชั้นต้นและศาลอุทธรณ์ที่ตัดสิน</label></li><li><input type="checkbox" id="print_item_department" class="print-item css-checkbox med" checked /><label for="print_item_department" class="css-label med elegant">แผนก</label></li><li><input type="checkbox" id="print_item_deka_black_no" class="print-item css-checkbox med" /><label for="print_item_deka_black_no" class="css-label med elegant">หมายเลขคดีคำของศาลฎีกา</label></li><li><input type="checkbox" id="print_item_primartcourt_deka_no" class="print-item css-checkbox med" checked /><label for="print_item_primartcourt_deka_no" class="css-label med elegant">หมายเลขคดีคำและหมายเลขคดีแดงของศาลชั้นต้น</label></li><li><input type="checkbox" id="print_item_remark" class="print-item css-checkbox med" checked /><label for="print_item_remark" class="css-label med elegant">หมายเหตุ</label></li><li style="margin-top: 5px; margin-bottom: 5px; padding-top: 5px; padding-left: 20px; border-top: 1px solid #EEE;"><small>รูปแบบการพิมพ์</small></li><li><input type="radio" id="print_style1" name="pring_style" class="print-item css-checkbox med" checked /><label for="print_style1" class="css-label med elegant">พิมพ์ต่อเนื่อง</label></li><li><input type="radio" id="print_style2" name="pring_style" class="print-item css-checkbox med" /><label for="print_style2" class="css-label med elegant">พิมพ์แบบขึ้นหน้าใหม่</label></li>								</ul>
+						
+								<hr class="section-heading-spacer" />
+								<div>
+									<button id="choose_print_item_all" class="btn btn-primary">เลือกทั้งหมด</button>
+									<button id="unchoose_print_item_all" class="btn btn-primary">ไม่เลือกทั้งหมด</button>
+									<button id="close_print_display_item" class="btn btn-success">ปิดหน้าต่าง</button>
+								</div>
+							</div>
+						</div>
+						<button id="print_choose_deka" class="btn btn-default">
+							<span class="glyphicon glyphicon-print"></span> พิมพ์คดีที่เลือกไว้
