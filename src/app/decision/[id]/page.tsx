@@ -65,7 +65,14 @@ export default async function DecisionDetailPage({ params }: { params: Promise<{
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-12 border-b border-slate-100 pb-10">
           {decision.parties && (
-            <DetailRow icon={<User />} label="ชื่อคู่ความ" value={decision.parties} fullWidth />
+            <DetailRow icon={<User />} label="ชื่อคู่ความ" value={
+              <div className="flex flex-col gap-1">
+                {decision.parties
+                  .replace(/\s+(จำเลย|ผู้ร้อง|ผู้คัดค้าน|โจทก์ร่วม|จำเลยร่วม)\s*-/g, '\n$1 -')
+                  .split('\n')
+                  .map((p, i) => <div key={i}>{p.trim()}</div>)}
+              </div>
+            } fullWidth />
           )}
           {decision.law && (
             <DetailRow icon={<FileText />} label="ชื่อกฎหมาย" value={<LawLinkList lawText={decision.law} books={books} />} fullWidth />
@@ -74,7 +81,14 @@ export default async function DecisionDetailPage({ params }: { params: Promise<{
             <DetailRow icon={<Gavel />} label="ชื่อองค์คณะ" value={decision.judge} />
           )}
           {decision.court && (
-            <DetailRow icon={<Building2 />} label="ศาลที่ตัดสิน" value={decision.court} />
+            <DetailRow icon={<Building2 />} label="ศาลที่ตัดสิน" value={
+              <div className="flex flex-col gap-1">
+                {decision.court
+                  .replace(/\s+(ศาลอุทธรณ์|ศาลฎีกา|แผนก|หมายเลขคดีดำ|หมายเลขคดีแดง|หมายเหตุ)/g, '\n$1')
+                  .split('\n')
+                  .map((p, i) => <div key={i}>{p.trim()}</div>)}
+              </div>
+            } />
           )}
           {decision.caseNumberSupreme && (
             <DetailRow icon={<MapPin />} label="หมายเลขคดีคำศาลฎีกา" value={decision.caseNumberSupreme} />
@@ -134,7 +148,7 @@ export default async function DecisionDetailPage({ params }: { params: Promise<{
           คำพิพากษาศาลฎีกาที่ {decision.decisionNumber}
         </div>
         <div className="w-1/2 text-right">
-          {decision.parties && decision.parties.split('\n').filter(Boolean).map((part, i) => {
+          {decision.parties && decision.parties.replace(/\s+(จำเลย|ผู้ร้อง|ผู้คัดค้าน|โจทก์ร่วม|จำเลยร่วม)\s*-/g, '\n$1 -').split('\n').filter(Boolean).map((part, i) => {
             let role = '';
             let name = part;
             

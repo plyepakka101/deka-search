@@ -34,10 +34,12 @@ export default function LawLinkList({ lawText, books }: { lawText: string, books
   // Format the text first: put abbreviations on new lines
   let formatted = lawText.replace(/\n/g, ' ').replace(/\s+,/g, ',').replace(/,\s+/g, ', ');
   
-  // Create a regex to match any of the aliases to put them on a new line
-  const escapedAliases = uniqueAliases.map(a => a.alias.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')).join('|');
-  const splitRegex = new RegExp(`\\s+(${escapedAliases})`, 'g');
-  formatted = formatted.replace(splitRegex, '\n$1');
+  if (uniqueAliases.length > 0) {
+    // Create a regex to match any of the aliases to put them on a new line
+    const escapedAliases = uniqueAliases.map(a => a.alias.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')).join('|');
+    const splitRegex = new RegExp(`\\s+(${escapedAliases})`, 'g');
+    formatted = formatted.replace(splitRegex, '\n$1');
+  }
 
   const lines = formatted.split('\n').filter(Boolean).map(l => l.trim());
 
