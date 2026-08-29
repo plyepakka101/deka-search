@@ -16,7 +16,9 @@ const notoSansThai = Noto_Sans_Thai({
 export const metadata: Metadata = {
   title: "Deka Search | ระบบสืบค้นคำพิพากษาศาลฎีกา",
   description: "ระบบสืบค้นคำพิพากษา คำสั่งคำร้องและคำวินิจฉัยศาลฎีกา",
-  manifest: "/manifest.json",
+};
+
+export const viewport = {
   themeColor: "#0ea5e9",
 };
 
