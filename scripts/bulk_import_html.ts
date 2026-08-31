@@ -1,9 +1,8 @@
+import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
 import * as cheerio from 'cheerio';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../src/lib/prisma';
 const IMPORT_DIR = path.join(process.cwd(), 'to_import');
 
 // Helper to extract decision year and number
@@ -135,7 +134,7 @@ async function main() {
   console.log(`Found ${existingKeys.size} existing decisions in DB.`);
 
   let totalImported = 0;
-  const BATCH_SIZE = 500;
+  const BATCH_SIZE = 50;
   let currentBatch: any[] = [];
 
   for (let i = 0; i < files.length; i++) {
@@ -155,7 +154,6 @@ async function main() {
         try {
           await prisma.decision.createMany({
             data: currentBatch,
-            skipDuplicates: true
           });
           totalImported += currentBatch.length;
         } catch (err) {
