@@ -220,7 +220,7 @@ export const resetData = () => {
 };
 
 export const getSettings = (): AppSettings => {
-  if (typeof window === 'undefined') return { darkMode: false, fontSize: 2, fontStyle: 'modern', voiceURI: '', speakingRate: 1.0 };
+  if (typeof window === 'undefined') return { darkMode: false, fontSize: 2, fontStyle: 'modern', lineHeight: 1.8, voiceURI: '', speakingRate: 1.0 };
   const stored = localStorage.getItem(SETTINGS_KEY);
   if (stored) {
     return JSON.parse(stored);
@@ -229,6 +229,7 @@ export const getSettings = (): AppSettings => {
     darkMode: false,
     fontSize: 2,
     fontStyle: 'modern',
+    lineHeight: 1.8,
     voiceURI: '',
     speakingRate: 1.0
   };

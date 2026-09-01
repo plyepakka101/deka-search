@@ -53,6 +53,7 @@ export interface AppSettings {
   darkMode: boolean;
   fontSize: number; // 1-5
   fontStyle: FontStyle;
+  lineHeight?: number; // 1.5, 1.8, 2.0
   voiceURI?: string;
   speakingRate?: number;
 }

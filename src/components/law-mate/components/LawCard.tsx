@@ -660,7 +660,7 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
                 ref={contentRef}
                 onMouseUp={handleTextSelection}
                 className={`text-gray-900 dark:text-gray-100 ${fontFamilyClass} selection:bg-law-200 dark:selection:bg-law-800`}
-                style={{ fontSize: 'var(--content-font-size, 16px)', lineHeight: '1.8' }}
+                style={{ fontSize: 'var(--content-font-size, 16px)', lineHeight: settings.lineHeight || 1.8 }}
             >
                 {renderContentWithFeatures()}
             </div>
