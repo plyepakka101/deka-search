@@ -164,6 +164,17 @@ export async function POST(req: Request) {
       }
 
       if (decisionNumber) {
+        // Auto-fix typos in the year (e.g. 123/4515 -> 123/2515)
+        const typoMatch = decisionNumber.match(/^(.+?\/)(\d{4})(.*)/);
+        if (typoMatch) {
+          let yearPart = parseInt(typoMatch[2], 10);
+          if (yearPart > 2600) {
+            // Replace the first two digits with 25
+            const fixedYear = "25" + typoMatch[2].substring(2);
+            decisionNumber = typoMatch[1] + fixedYear + typoMatch[3];
+          }
+        }
+
         // Clean up: extract only up to the 4-digit year (Thai or Arabic), handling ranges and prefixes
         const cleanMatch = decisionNumber.match(/^(.+?\/(?:24|25|๒๔|๒๕)[0-9๐-๙]{2})/);
         if (cleanMatch) {
