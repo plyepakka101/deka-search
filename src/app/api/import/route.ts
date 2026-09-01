@@ -2,9 +2,16 @@ import { NextResponse } from "next/server";
 import * as cheerio from "cheerio";
 import { prisma } from "@/lib/prisma";
 import { thaiToArabic } from "@/components/law-mate/utils/textUtils";
+import { auth } from "@/auth";
 
 export async function POST(req: Request) {
   try {
+    const session = await auth();
+    // @ts-ignore
+    if (!session || !session.user?.isAdmin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { htmlContent, fileName } = await req.json();
 
     if (!htmlContent) {

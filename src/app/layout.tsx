@@ -22,20 +22,22 @@ export const viewport = {
   themeColor: "#0ea5e9",
 };
 
+import { auth } from "@/auth";
 import Navbar from "@/components/Navbar";
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth();
   return (
     <html
       lang="th"
       className={`${inter.variable} ${notoSansThai.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-thai bg-slate-50 text-slate-900">
-        <Navbar />
+        <Navbar session={session} />
         {children}
       </body>
     </html>

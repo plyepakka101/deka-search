@@ -1,11 +1,14 @@
+﻿
 "use client";
 
 import Link from "next/link";
-import { Scale, Menu, X, UserCircle, BookOpen, Bookmark } from "lucide-react";
+import { Scale, Menu, X, UserCircle, BookOpen, Bookmark, LogOut } from "lucide-react";
 import { useState } from "react";
+import { signIn, signOut } from "next-auth/react";
 
-export default function Navbar() {
+export default function Navbar({ session }: { session: any }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const isAdmin = session?.user?.isAdmin;
 
   return (
     <>
@@ -32,42 +35,55 @@ export default function Navbar() {
                 <Bookmark className="w-4 h-4" />
                 บุ๊กมาร์ก
               </Link>
-              <Link href="/admin/import" className="text-slate-600 hover:text-primary transition-colors">นำเข้าคำพิพากษา</Link>
-              <Link href="/admin/import-law" className="text-slate-600 hover:text-primary transition-colors">นำเข้ากฎหมาย</Link>
             </nav>
           </div>
 
           <div className="flex items-center gap-4">
-            <button className="hidden md:flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-primary transition-colors">
-              <UserCircle className="w-5 h-5" />
-              เข้าสู่ระบบ
-            </button>
-            
-            {/* Mobile Menu Toggle */}
-          <button 
-            type="button"
-            className="md:hidden p-2 text-slate-600 active:bg-slate-100 rounded-lg"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            aria-label="Toggle Menu"
-          >
-            {isMenuOpen ? (
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none">
-                <path d="M18 6 6 18" />
-                <path d="m6 6 12 12" />
-              </svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none">
-                <line x1="4" x2="20" y1="12" y2="12" />
-                <line x1="4" x2="20" y1="6" y2="6" />
-                <line x1="4" x2="20" y1="18" y2="18" />
-              </svg>
+            {/* Admin Buttons - Desktop Only */}
+            {isAdmin && (
+              <div className="hidden md:flex items-center gap-3">
+                <Link href="/admin/import" className="text-xs px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
+                  นำเข้าคำพิพากษา
+                </Link>
+                <Link href="/admin/import-law" className="text-xs px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
+                  นำเข้ากฎหมาย
+                </Link>
+              </div>
             )}
-          </button>
-        </div>
-      </div>
-    </header>
+            
+            {/* Login / Avatar Desktop */}
+            <div className="hidden md:flex items-center gap-3 border-l pl-4 border-slate-200">
+              {session ? (
+                <div className="flex items-center gap-3">
+                  {session.user.image ? (
+                    <img src={session.user.image} alt="User" className="w-8 h-8 rounded-full border border-slate-200" />
+                  ) : (
+                    <UserCircle className="w-6 h-6 text-slate-400" />
+                  )}
+                  <button onClick={() => signOut()} className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-full transition-colors" title="ออกจากระบบ">
+                    <LogOut className="w-5 h-5" />
+                  </button>
+                </div>
+              ) : (
+                <button onClick={() => signIn('google')} className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-primary transition-colors">
+                  <UserCircle className="w-5 h-5" />
+                  เข้าสู่ระบบ
+                </button>
+              )}
+            </div>
 
-      {/* Mobile Nav Dropdown (Moved outside header to avoid backdrop-blur containing block issue) */}
+            {/* Mobile Menu Button */}
+            <button 
+              className="md:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+            >
+              {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Mobile Nav Dropdown */}
       {isMenuOpen && (
         <div className="md:hidden fixed top-16 left-0 right-0 bottom-0 bg-white shadow-2xl z-[100] overflow-y-auto">
           <nav className="flex flex-col p-6 gap-6 text-lg font-medium">
@@ -82,16 +98,44 @@ export default function Navbar() {
               <Bookmark className="w-6 h-6" />
               บุ๊กมาร์ก
             </Link>
-            <Link href="/admin/import" onClick={() => setIsMenuOpen(false)} className="text-slate-600 hover:text-primary transition-colors">นำเข้าคำพิพากษา</Link>
-            <Link href="/admin/import-law" onClick={() => setIsMenuOpen(false)} className="text-slate-600 hover:text-primary transition-colors">นำเข้ากฎหมาย</Link>
+            
+            {isAdmin && (
+              <>
+                <Link href="/admin/import" onClick={() => setIsMenuOpen(false)} className="text-slate-600 hover:text-primary transition-colors">นำเข้าคำพิพากษา</Link>
+                <Link href="/admin/import-law" onClick={() => setIsMenuOpen(false)} className="text-slate-600 hover:text-primary transition-colors">นำเข้ากฎหมาย</Link>
+              </>
+            )}
+            
             <hr className="border-slate-100 my-2" />
-            <button className="flex items-center justify-center gap-3 text-slate-600 hover:text-primary transition-colors w-full py-4 bg-slate-50 rounded-xl">
-              <UserCircle className="w-6 h-6" />
-              เข้าสู่ระบบ
-            </button>
+            
+            {session ? (
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-3 px-2">
+                  {session.user.image ? (
+                    <img src={session.user.image} alt="User" className="w-10 h-10 rounded-full border border-slate-200" />
+                  ) : (
+                    <UserCircle className="w-10 h-10 text-slate-400" />
+                  )}
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-slate-900">{session.user.name}</span>
+                    <span className="text-xs text-slate-500">{session.user.email}</span>
+                  </div>
+                </div>
+                <button onClick={() => { signOut(); setIsMenuOpen(false); }} className="flex items-center justify-center gap-3 text-red-600 hover:bg-red-50 transition-colors w-full py-4 rounded-xl">
+                  <LogOut className="w-6 h-6" />
+                  ออกจากระบบ
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => { signIn('google'); setIsMenuOpen(false); }} className="flex items-center justify-center gap-3 text-slate-600 hover:text-primary transition-colors w-full py-4 bg-slate-50 rounded-xl">
+                <UserCircle className="w-6 h-6" />
+                เข้าสู่ระบบ
+              </button>
+            )}
           </nav>
         </div>
       )}
     </>
   );
 }
+
