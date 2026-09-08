@@ -40,7 +40,7 @@ const getCachedSortedLaws = unstable_cache(
       .sort((a, b) => b.count - a.count)
       .slice(0, 500);
   },
-  ['sorted-laws-aggregation'],
+  ['sorted-laws-aggregation-v2'],
   { revalidate: 3600, tags: ['laws-aggregation'] } // cache for 1 hour
 );
 

@@ -5,7 +5,7 @@ import BookmarkButton from "@/components/BookmarkButton";
 import PinToSectionButton from "@/components/PinToSectionButton";
 import PopularSearches from "@/components/PopularSearches";
 import BooleanSearchInput from "@/components/BooleanSearchInput";
-import { parseLaws, LAW_MAP, getSectionCategory, initCategoryCache } from "@/utils/lawParser";
+import { parseLaws, LAW_MAP, getSectionCategory, initCategoryCache, compareSections } from "@/utils/lawParser";
 import { unstable_cache } from "next/cache";
 
 export const dynamic = "force-dynamic";
@@ -64,18 +64,14 @@ const getCachedLawAggregations = unstable_cache(
       
       lawSections[lawName] = sortedCategories.map(cat => {
          const sections = categoryMap.get(cat)!;
-         sections.sort((a, b) => {
-            const numA = parseFloat(a.section.match(/\d+(\.\d+)?/)?.[0] || "0");
-            const numB = parseFloat(b.section.match(/\d+(\.\d+)?/)?.[0] || "0");
-            return numA - numB;
-         });
+         sections.sort((a, b) => compareSections(a.section, b.section));
          return { category: cat, sections };
       });
     }
 
     return { lawGroups, lawSections };
   },
-  ['law-aggregations-v3'],
+  ['law-aggregations-v4'],
   { revalidate: 3600, tags: ['laws-aggregation'] }
 );
 
@@ -236,11 +232,7 @@ export default async function SearchPage({
            .filter(cat => !(shouldHideFallback && cat.includes('(มาตราทั่วไป / อื่นๆ)')))
            .map(cat => {
              const sections = categoryMap.get(cat)!;
-             sections.sort((a, b) => {
-                const numA = parseFloat(a.section.match(/\d+(\.\d+)?/)?.[0] || "0");
-                const numB = parseFloat(b.section.match(/\d+(\.\d+)?/)?.[0] || "0");
-                return numA - numB;
-             });
+             sections.sort((a, b) => compareSections(a.section, b.section));
              return { category: cat, sections };
            });
       }
