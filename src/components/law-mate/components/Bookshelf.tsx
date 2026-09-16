@@ -1,7 +1,8 @@
 
 import React from 'react';
 import { LawBook, LawSection } from '../types';
-import { Book, ChevronRight, Library } from 'lucide-react';
+import { Book, ChevronRight, Library, Brain } from 'lucide-react';
+import { getLocalItems } from '../services/memorizeService';
 
 interface BookshelfProps {
   books: LawBook[];
@@ -10,9 +11,14 @@ interface BookshelfProps {
 }
 
 export const Bookshelf: React.FC<BookshelfProps> = ({ books, laws, onSelectBook }) => {
+  const memoItems = getLocalItems();
   
   const getLawCount = (bookId: string) => {
     return laws.filter(l => l.bookId === bookId).length;
+  };
+
+  const getMemoCount = (bookId: string) => {
+    return memoItems.filter(i => i.bookId === bookId || i.deckId === `deck-${bookId}` || i.sectionId.startsWith(`${bookId}-`)).length;
   };
 
   return (
@@ -52,9 +58,17 @@ export const Bookshelf: React.FC<BookshelfProps> = ({ books, laws, onSelectBook 
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 font-sans">
                         {book.description}
                     </p>
-                    <div className="flex items-center text-xs text-gray-400 font-medium">
-                        <Book size={12} className="mr-1" />
-                        <span>{count} มาตรา</span>
+                    <div className="flex items-center gap-3 text-xs text-gray-400 font-medium">
+                        <span className="flex items-center">
+                          <Book size={12} className="mr-1" />
+                          <span>{count} มาตรา</span>
+                        </span>
+                        {getMemoCount(book.id) > 0 && (
+                          <span className="flex items-center text-purple-600 dark:text-purple-400 font-semibold bg-purple-50 dark:bg-purple-950/60 px-2 py-0.5 rounded-full">
+                            <Brain size={11} className="mr-1" />
+                            <span>{getMemoCount(book.id)} ในชุดท่อง</span>
+                          </span>
+                        )}
                     </div>
                  </div>
                  

@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { LawSection, UserNote, AppSettings, TextHighlight } from '../types';
 import { getOriginalLaw, getBooks } from '../services/dataService';
-import { BookOpen, Edit, Save, Trash2, ExternalLink, Star, Share2, Volume2, Square, Scale, History, Search, Highlighter, X } from 'lucide-react';
+import { BookOpen, Edit, Save, Trash2, ExternalLink, Star, Share2, Volume2, Square, Scale, History, Search, Highlighter, X, Brain, Play } from 'lucide-react';
 import { SECTION_REF_REGEX, thaiToArabic, createHighlightRegex } from '../utils/textUtils';
 import { DiffView } from './DiffView';
+import { MemorizePlayer } from './MemorizePlayer';
+import { addSectionToDeck, removeItem, getLocalItems, onMemorizeDataChanged } from '../services/memorizeService';
 
 interface LawCardProps {
   law: LawSection;
@@ -44,6 +46,38 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
   // Linked Decisions
   const [linkedDecisions, setLinkedDecisions] = useState<any[]>([]);
   const [showLinkedDecisions, setShowLinkedDecisions] = useState(false);
+
+  // Memorization State
+  const [memoItems, setMemoItems] = useState(getLocalItems());
+  const [showQuickMemorizeModal, setShowQuickMemorizeModal] = useState(false);
+
+  useEffect(() => {
+    return onMemorizeDataChanged(() => {
+      setMemoItems(getLocalItems());
+    });
+  }, []);
+
+  const existingMemoItem = memoItems.find(i => i.sectionId === law.id);
+  const isInMemo = Boolean(existingMemoItem);
+
+  const handleToggleMemorize = async () => {
+    if (existingMemoItem) {
+      if (window.confirm(`ต้องการนำมาตรา ${law.sectionNumber} ออกจากชุดท่องสอบหรือไม่?`)) {
+        await removeItem(existingMemoItem.id);
+      }
+      return;
+    }
+    const targetDeckId = `deck-${law.bookId || 'crim'}`;
+    await addSectionToDeck(targetDeckId, law.id, `มาตรา ${law.sectionNumber}`);
+  };
+
+  const handleOpenQuickMemorize = async () => {
+    if (!existingMemoItem) {
+      const targetDeckId = `deck-${law.bookId || 'crim'}`;
+      await addSectionToDeck(targetDeckId, law.id, `มาตรา ${law.sectionNumber}`);
+    }
+    setShowQuickMemorizeModal(true);
+  };
 
   useEffect(() => {
     if (note?.linkedDekaIds && note.linkedDekaIds.length > 0) {
@@ -603,7 +637,7 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
       {/* Minimal Header for Actions & Metadata */}
       <div className={`px-6 pt-4 flex justify-between items-start transition-colors ${isHighlighted ? 'bg-yellow-50/30 dark:bg-yellow-900/10' : ''}`}>
         <div className="flex-1 min-w-0 mr-4">
-           <div className="flex items-center space-x-2">
+           <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                 {law.category && (
                     <span className="text-gray-500 dark:text-gray-400 text-xs font-medium truncate font-sans">
                         {law.category}
@@ -612,6 +646,12 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
                 {law.isCustom && (
                     <span className={`text-[10px] px-1.5 py-0.5 rounded flex items-center space-x-1 ${hasChanges ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'}`}>
                         <span>{hasChanges ? 'แก้ไขแล้ว' : 'กำหนดเอง'}</span>
+                    </span>
+                )}
+                {isInMemo && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 font-bold flex items-center gap-1 shadow-xs">
+                        <Brain size={11} />
+                        <span>ในชุดท่องสอบ</span>
                     </span>
                 )}
            </div>
@@ -723,6 +763,31 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
             <span>แชร์</span>
           </button>
 
+          {/* Memorization (ท่องสอบ) Button Group */}
+          <div className="inline-flex items-center rounded-lg border border-purple-200 dark:border-purple-800/60 overflow-hidden shadow-xs">
+            <button 
+              onClick={handleToggleMemorize}
+              className={`flex items-center space-x-1.5 text-sm px-3 py-1.5 transition-all duration-200 hover:scale-105 active:scale-95 ${
+                isInMemo 
+                  ? 'text-purple-700 bg-purple-100 dark:text-purple-300 dark:bg-purple-950/80 font-bold' 
+                  : 'text-gray-600 dark:text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-gray-700'
+              }`}
+              title={isInMemo ? "มาตรานี้อยู่ในชุดท่องสอบแล้ว (คลิกเพื่อนำออก)" : "เพิ่มมาตรานี้เข้าสู่ชุดท่องสอบ"}
+            >
+              <Brain size={16} className={isInMemo ? "text-purple-600 dark:text-purple-400" : ""} />
+              <span>{isInMemo ? 'ท่องสอบ ⭐' : 'เพิ่มในท่องสอบ'}</span>
+            </button>
+
+            <button
+              onClick={handleOpenQuickMemorize}
+              className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 dark:text-purple-300 text-xs font-semibold border-l border-purple-200 dark:border-purple-800/60 transition flex items-center gap-1"
+              title="เริ่มฝึกท่องจำมาตรานี้ทันที (เลือกได้ทั้ง 4 โหมด)"
+            >
+              <Play size={12} />
+              <span>เริ่มท่อง</span>
+            </button>
+          </div>
+
           {(law.sourceUrl || officialUrl) && (
             <a 
               href={law.sourceUrl || officialUrl}
@@ -822,6 +887,36 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
         )}
 
       </div>
+
+      {/* Quick Memorize Modal Dialog */}
+      {showQuickMemorizeModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="relative w-full max-w-2xl bg-white dark:bg-gray-800 rounded-3xl p-4 sm:p-6 shadow-2xl border border-gray-100 dark:border-gray-700 animate-in fade-in zoom-in-95 my-8">
+            <MemorizePlayer
+              items={[
+                existingMemoItem || {
+                  id: `deck-${law.bookId || 'crim'}_${law.id}`,
+                  deckId: `deck-${law.bookId || 'crim'}`,
+                  sectionId: law.id,
+                  title: `มาตรา ${law.sectionNumber}`,
+                  sectionNumber: law.sectionNumber,
+                  content: law.content,
+                  bookId: law.bookId,
+                  repetitions: 0,
+                  intervalDays: 1,
+                  easeFactor: 2.5,
+                  streak: 0,
+                  status: 'new'
+                }
+              ]}
+              deckTitle={`ท่องจำมาตรา ${law.sectionNumber}`}
+              settings={settings}
+              onFinish={() => setShowQuickMemorizeModal(false)}
+              onBack={() => setShowQuickMemorizeModal(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

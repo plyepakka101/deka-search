@@ -43,6 +43,11 @@ const App: React.FC = () => {
   useEffect(() => {
       const handleHashChange = () => {
           const hash = window.location.hash;
+          if (hash.toLowerCase().includes('memorize')) {
+              setView(ViewState.MEMORIZE);
+              setActiveBookId(null);
+              return;
+          }
           if (hash.includes('?s=')) {
               const pathPart = hash.split('?')[0]; // e.g. "#/crim_proc"
               const bookIdFromHash = pathPart.replace('#/', '');
@@ -310,6 +315,16 @@ const App: React.FC = () => {
                         <span>{item.l}</span>
                     </button>
                     ))}
+                    <button
+                        onClick={() => {
+                            setView(ViewState.MEMORIZE);
+                            setSearchQuery('');
+                        }}
+                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all font-sans text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/40 font-semibold`}
+                    >
+                        <Brain size={20} className="text-purple-600 dark:text-purple-400 shrink-0" />
+                        <span>ท่องสอบ ({activeBook?.abbreviation})</span>
+                    </button>
                 </>
             )}
             
@@ -385,8 +400,16 @@ const App: React.FC = () => {
                                 )}
                              </div>
                              
-                             <div className="flex items-center gap-2">
-                               <div className="hidden md:block"><FontSizeController /></div>
+                              <div className="flex items-center gap-2">
+                                <button 
+                                   onClick={() => setView(ViewState.MEMORIZE)}
+                                   className="flex items-center space-x-1.5 text-xs text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800/60 px-2.5 py-1.5 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/60 transition-colors font-semibold shadow-xs"
+                                   title="เข้าสู่โหมดท่องจำเพื่อเตรียมสอบ"
+                                >
+                                   <Brain size={14} className="text-purple-600 dark:text-purple-400" />
+                                   <span>ท่องสอบฉบับนี้</span>
+                                </button>
+                                <div className="hidden md:block"><FontSizeController /></div>
                                <button 
                                   onClick={openOfficialSource}
                                   className="hidden md:flex items-center space-x-1 text-xs text-law-600 dark:text-law-400 bg-law-50 dark:bg-law-900/50 px-2 py-1 rounded hover:bg-law-100 dark:hover:bg-law-900/80 transition-colors"

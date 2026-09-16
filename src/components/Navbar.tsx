@@ -1,8 +1,8 @@
-﻿
+
 "use client";
 
 import Link from "next/link";
-import { Scale, Menu, X, UserCircle, BookOpen, Bookmark, LogOut } from "lucide-react";
+import { Scale, Menu, X, UserCircle, BookOpen, Bookmark, LogOut, Brain } from "lucide-react";
 import { useState } from "react";
 import { signIn, signOut } from "next-auth/react";
 
@@ -30,6 +30,10 @@ export default function Navbar({ session }: { session: any }) {
               <Link href="/laws" className="text-slate-600 hover:text-primary transition-colors flex items-center gap-1">
                 <BookOpen className="w-4 h-4" />
                 ตัวบทกฎหมาย
+              </Link>
+              <Link href="/laws#memorize" className="text-purple-600 hover:text-purple-700 transition-colors flex items-center gap-1 font-semibold">
+                <Brain className="w-4 h-4" />
+                ท่องสอบ
               </Link>
               <Link href="/bookmarks" className="text-slate-600 hover:text-primary transition-colors flex items-center gap-1">
                 <Bookmark className="w-4 h-4" />
@@ -93,6 +97,10 @@ export default function Navbar({ session }: { session: any }) {
             <Link href="/laws" onClick={() => setIsMenuOpen(false)} className="text-slate-600 hover:text-primary transition-colors flex items-center gap-3">
               <BookOpen className="w-6 h-6" />
               ตัวบทกฎหมาย
+            </Link>
+            <Link href="/laws#memorize" onClick={() => setIsMenuOpen(false)} className="text-purple-600 hover:text-purple-700 transition-colors flex items-center gap-3 font-semibold">
+              <Brain className="w-6 h-6 text-purple-600" />
+              ท่องสอบ (เตรียมสอบ)
             </Link>
             <Link href="/bookmarks" onClick={() => setIsMenuOpen(false)} className="text-slate-600 hover:text-primary transition-colors flex items-center gap-3">
               <Bookmark className="w-6 h-6" />
