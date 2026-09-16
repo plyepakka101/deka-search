@@ -7,7 +7,8 @@ import { LawEditor } from './components/LawEditor';
 import { TOCView } from './components/TOCView';
 import { SettingsView } from './components/SettingsView';
 import { Bookshelf } from './components/Bookshelf';
-import { Home, Search, BookMarked, PlusSquare, Scale, ExternalLink, List, Star, Settings, Library, ChevronLeft, Info, Loader2 } from 'lucide-react';
+import { MemorizeHub } from './components/MemorizeHub';
+import { Home, Search, BookMarked, PlusSquare, Scale, ExternalLink, List, Star, Settings, Library, ChevronLeft, Info, Loader2, Brain } from 'lucide-react';
 import { normalizeSearchQuery, thaiToArabic } from './utils/textUtils';
 
 import FontSizeController from '@/components/FontSizeController';
@@ -192,7 +193,7 @@ const App: React.FC = () => {
     if (activeBookId) {
         scopeLaws = laws.filter(l => l.bookId === activeBookId);
     } else {
-        if (view === ViewState.BOOKSHELF) return [];
+        if (view === ViewState.BOOKSHELF || view === ViewState.MEMORIZE) return [];
     }
 
     if (view === ViewState.NOTES) {
@@ -269,6 +270,21 @@ const App: React.FC = () => {
                 <Library size={20} />
                 <span>ห้องสมุดกฎหมาย</span>
             </button>
+
+            <button 
+                onClick={() => { setView(ViewState.MEMORIZE); setActiveBookId(null); setSearchQuery(''); }} 
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all font-sans ${
+                  view === ViewState.MEMORIZE 
+                    ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 font-bold shadow-sm' 
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                }`}
+            >
+                <Brain size={20} className="text-purple-600 dark:text-purple-400 shrink-0"/>
+                <div className="flex items-center justify-between w-full">
+                  <span>ท่องสอบ (เตรียมสอบ)</span>
+                  <span className="text-[10px] bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded-full font-bold">ใหม่</span>
+                </div>
+            </button>
             
             {activeBookId && (
                 <>
@@ -319,6 +335,16 @@ const App: React.FC = () => {
                     <Scale className="text-law-600" size={24} />
                     <h1 className="text-lg font-bold text-gray-800 dark:text-gray-100 font-sans">Thai Law Mate</h1>
                 </div>
+             ) : view === ViewState.MEMORIZE ? (
+                <div className="flex items-center space-x-2">
+                    <button onClick={handleBackToBookshelf} className="mr-1 text-gray-500">
+                        <ChevronLeft size={24} />
+                    </button>
+                    <div className="flex items-center space-x-2">
+                      <Brain className="text-purple-600" size={22} />
+                      <h1 className="text-sm font-bold text-gray-800 dark:text-gray-100 font-sans">ท่องสอบ (Active Recall)</h1>
+                    </div>
+                </div>
              ) : (
                  <div className="flex items-center space-x-2 overflow-hidden">
                     <button onClick={handleBackToBookshelf} className="mr-1 text-gray-500">
@@ -343,7 +369,7 @@ const App: React.FC = () => {
           </header>
 
           {/* Dynamic Header / Title Bar */}
-          {view !== ViewState.BOOKSHELF && activeBook && view !== ViewState.ADD && (
+          {view !== ViewState.BOOKSHELF && view !== ViewState.MEMORIZE && activeBook && view !== ViewState.ADD && (
              <div className="p-4 md:p-0 md:mb-6 sticky md:static top-[60px] z-10 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur md:bg-transparent font-sans">
                 {view === ViewState.HOME && (
                 <div className="space-y-3">
@@ -440,6 +466,10 @@ const App: React.FC = () => {
                 <Bookshelf books={books} laws={laws} onSelectBook={handleBookSelect} />
             )}
 
+            {view === ViewState.MEMORIZE && (
+                <MemorizeHub settings={settings} />
+            )}
+
             {view === ViewState.ADD && (
               <LawEditor 
                 initialBookId={activeBookId}
@@ -514,9 +544,10 @@ const App: React.FC = () => {
                     <NavItem targetView={ViewState.SEARCH} icon={Search} label="ค้นหา" />
                 </>
             ) : (
-                // Simple nav for bookshelf view
+                 // Simple nav for bookshelf / memorize view
                  <>
                     <NavItem targetView={ViewState.BOOKSHELF} icon={Library} label="ห้องสมุด" />
+                    <NavItem targetView={ViewState.MEMORIZE} icon={Brain} label="ท่องสอบ" />
                     <NavItem targetView={ViewState.SETTINGS} icon={Settings} label="ตั้งค่า" />
                  </>
             )}
