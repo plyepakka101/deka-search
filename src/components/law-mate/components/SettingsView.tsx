@@ -1,7 +1,18 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Download, Upload, Settings as SettingsIcon, Monitor, Cloud, HardDrive, Info, Volume2 } from 'lucide-react';
-import { exportData, importData, resetData } from '../services/dataService';
-import { AppSettings } from '../types';
+import { 
+  Download, Upload, Settings as SettingsIcon, Monitor, Cloud, HardDrive, 
+  Info, Volume2, CheckSquare, Square, FileText, Brain, Bookmark, 
+  BookOpen, AlertTriangle, X, Check, RefreshCw, FileCheck
+} from 'lucide-react';
+import { 
+  exportData, 
+  importData, 
+  inspectBackupData, 
+  resetData, 
+  DEFAULT_EXPORT_OPTIONS, 
+  ImportSummary 
+} from '../services/dataService';
+import { AppSettings, ExportOptions } from '../types';
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -12,7 +23,62 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
+  // Export options state
+  const [exportOpts, setExportOpts] = useState<ExportOptions>(DEFAULT_EXPORT_OPTIONS);
+
+  // Current storage counts
+  const [counts, setCounts] = useState({
+    notes: 0,
+    starred: 0,
+    linkedDekas: 0,
+    memoDecks: 0,
+    memoCards: 0,
+    bookmarks: 0,
+    customLaws: 0,
+  });
+
+  // Pre-restore inspection modal state
+  const [pendingRestore, setPendingRestore] = useState<{
+    content: string;
+    summary: ImportSummary;
+  } | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  const refreshCounts = () => {
+    if (typeof window === 'undefined') return;
+    try {
+      const rawNotes = localStorage.getItem('thai_law_mate_notes');
+      let notes = 0, starred = 0, linkedDekas = 0;
+      if (rawNotes) {
+        const parsed = JSON.parse(rawNotes);
+        notes = Object.keys(parsed).length;
+        Object.values(parsed).forEach((n: any) => {
+          if (n.isHighlighted) starred++;
+          if (n.linkedDekaIds && Array.isArray(n.linkedDekaIds)) linkedDekas += n.linkedDekaIds.length;
+        });
+      }
+
+      const rawDecks = localStorage.getItem('thai_law_mate_memo_decks');
+      const memoDecks = rawDecks ? JSON.parse(rawDecks).length : 0;
+
+      const rawItems = localStorage.getItem('thai_law_mate_memo_items');
+      const memoCards = rawItems ? JSON.parse(rawItems).length : 0;
+
+      const rawBookmarks = localStorage.getItem('deka_bookmarks');
+      const bookmarks = rawBookmarks ? JSON.parse(rawBookmarks).length : 0;
+
+      const rawCustomLaws = localStorage.getItem('thai_law_mate_custom_laws');
+      const customLaws = rawCustomLaws ? JSON.parse(rawCustomLaws).length : 0;
+
+      setCounts({ notes, starred, linkedDekas, memoDecks, memoCards, bookmarks, customLaws });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
+    refreshCounts();
+
     const loadVoices = () => {
       const availableVoices = window.speechSynthesis.getVoices();
       setVoices(availableVoices);
@@ -26,8 +92,28 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     }
   }, []);
 
+  const toggleExportOpt = (key: keyof ExportOptions) => {
+    setExportOpts(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const setAllExportOpts = (value: boolean) => {
+    setExportOpts({
+      includeNotes: value,
+      includeCustomLaws: value,
+      includeMemorization: value,
+      includeBookmarks: value,
+      includeSettings: value,
+    });
+  };
+
+  const hasAnyExportSelected = Object.values(exportOpts).some(Boolean);
+
   const handleExport = () => {
-    const data = exportData();
+    if (!hasAnyExportSelected) {
+      alert('กรุณาเลือกข้อมูลอย่างน้อย 1 รายการเพื่อสำรอง');
+      return;
+    }
+    const data = exportData(exportOpts);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -50,20 +136,34 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     const reader = new FileReader();
     reader.onload = (e) => {
       const content = e.target?.result as string;
-      if (importData(content)) {
-        alert('นำเข้าข้อมูลสำเร็จ ระบบจะรีโหลดหน้าเว็บ');
-        window.location.reload();
-      } else {
-        alert('ไฟล์ไม่ถูกต้อง หรือรูปแบบข้อมูลผิดพลาด');
+      const inspection = inspectBackupData(content);
+      if (!inspection.valid || !inspection.summary) {
+        setImportError(inspection.error || 'ไฟล์ไม่ถูกต้อง หรือรูปแบบข้อมูลผิดพลาด');
+        return;
       }
+      setPendingRestore({
+        content,
+        summary: inspection.summary,
+      });
     };
     reader.readAsText(file);
     // Reset input
     event.target.value = '';
   };
 
+  const handleConfirmRestore = () => {
+    if (!pendingRestore) return;
+    const ok = importData(pendingRestore.content);
+    if (ok) {
+      alert('กู้คืนข้อมูลสำเร็จ ระบบจะรีโหลดหน้าเว็บเพื่ออัปเดตข้อมูล');
+      window.location.reload();
+    } else {
+      alert('เกิดข้อผิดพลาดในการกู้คืนข้อมูล');
+    }
+  };
+
   const handleReset = () => {
-    if (window.confirm('คุณแน่ใจหรือไม่ว่าต้องการล้างข้อมูลโน้ต ไฮไลต์ และกฎหมายที่แก้ไขทั้งหมด?\n\nการกระทำนี้ไม่สามารถกู้คืนได้ (ยกเว้นคุณมีไฟล์ Backup)')) {
+    if (window.confirm('คุณแน่ใจหรือไม่ว่าต้องการล้างข้อมูลทั้งหมด?\n(รวมถึงโน้ต, การ์ดท่องสอบ, บุ๊กมาร์ก และกฎหมายที่แก้ไข)\n\nการกระทำนี้ไม่สามารถกู้คืนได้ (ยกเว้นคุณมีไฟล์ Backup)')) {
       resetData();
       alert('ล้างข้อมูลสำเร็จ ระบบจะรีโหลดหน้าเว็บ');
       window.location.reload();
@@ -248,88 +348,454 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                  <span>เร็ว (2.0x)</span>
               </div>
            </div>
+
+
+
         </div>
       </div>
 
       {/* Data Management */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-        <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
+        <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 flex items-center justify-between">
           <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center">
             <HardDrive className="mr-2 text-law-600 dark:text-law-400" size={20} />
             จัดการข้อมูล (Backup & Restore)
           </h3>
+          <button 
+            onClick={refreshCounts}
+            className="text-xs text-gray-500 hover:text-law-600 dark:text-gray-400 dark:hover:text-law-300 flex items-center gap-1 transition-colors"
+            title="รีเฟรชยอดข้อมูลปัจจุบัน"
+          >
+            <RefreshCw size={12} />
+            <span>อัปเดตยอด</span>
+          </button>
         </div>
 
         <div className="p-6 space-y-6">
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800/50 flex items-start space-x-3">
-                <Info className="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" size={18} />
-                <div className="text-sm text-blue-800 dark:text-blue-200">
-                    <p className="font-semibold mb-1">การสำรองข้อมูลบน Cloud</p>
-                    <p className="opacity-90 leading-relaxed">
-                        คุณสามารถกด <strong>"ส่งออกไฟล์"</strong> แล้วนำไฟล์ที่ได้ไปเก็บไว้ใน <strong>Google Drive</strong>, <strong>iCloud</strong> หรือส่งเข้าอีเมลเพื่อป้องกันข้อมูลสูญหายได้
-                    </p>
-                </div>
+          <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800/50 flex items-start space-x-3">
+            <Info className="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" size={18} />
+            <div className="text-sm text-blue-800 dark:text-blue-200">
+              <p className="font-semibold mb-1">การเก็บสำรองข้อมูล (Cloud & Local)</p>
+              <p className="opacity-90 leading-relaxed text-xs sm:text-sm">
+                เลือกหมวดหมู่ที่ต้องการ แล้วกด <strong>"ดาวน์โหลดไฟล์สำรอง (.json)"</strong> จากนั้นสามารถนำไฟล์ไปเก็บไว้ใน Google Drive, iCloud, OneDrive หรือส่งเข้าอีเมลเพื่อความปลอดภัยได้ตลอดเวลา
+              </p>
+            </div>
+          </div>
+
+          {/* Export Category Selector */}
+          <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 sm:p-5 bg-gray-50/40 dark:bg-gray-900/20">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+              <div>
+                <h4 className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                  <Download className="text-law-600 dark:text-law-400" size={18} />
+                  เลือกหมวดหมู่ข้อมูลที่ต้องการสำรอง
+                </h4>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  ทำเครื่องหมายถูกเฉพาะข้อมูลที่คุณต้องการนำไปใช้งานหรือจัดเก็บ
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setAllExportOpts(true)}
+                  className="px-2.5 py-1 text-law-700 dark:text-law-300 hover:bg-law-50 dark:hover:bg-law-900/30 rounded border border-law-200 dark:border-law-800 font-medium transition-colors"
+                >
+                  เลือกทั้งหมด
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAllExportOpts(false)}
+                  className="px-2.5 py-1 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 font-medium transition-colors"
+                >
+                  ล้างการเลือก
+                </button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Export */}
-                <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col items-center text-center hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                    <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center mb-3">
-                        <Download size={24} />
-                    </div>
-                    <h4 className="font-bold text-gray-900 dark:text-gray-100 mb-1">สำรองข้อมูล</h4>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 h-8">
-                        ดาวน์โหลดข้อมูลทั้งหมดเป็นไฟล์ .json เพื่อเก็บรักษาไว้
-                    </p>
-                    <button 
-                        onClick={handleExport}
-                        className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center space-x-2"
-                    >
-                        <Cloud size={16} />
-                        <span>ส่งออกไฟล์</span>
-                    </button>
+            <div className="space-y-2.5">
+              {/* Option 1: Notes & Highlights & Starred & Linked Deka */}
+              <div 
+                onClick={() => toggleExportOpt('includeNotes')}
+                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all select-none ${
+                  exportOpts.includeNotes 
+                    ? 'bg-white dark:bg-gray-800 border-law-400 dark:border-law-600 shadow-xs' 
+                    : 'bg-white/50 dark:bg-gray-800/40 border-gray-200 dark:border-gray-700 opacity-60'
+                }`}
+              >
+                <div className="pt-0.5 text-law-600 dark:text-law-400">
+                  {exportOpts.includeNotes ? <CheckSquare size={18} /> : <Square size={18} />}
                 </div>
-
-                {/* Import */}
-                <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col items-center text-center hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                    <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-full flex items-center justify-center mb-3">
-                        <Upload size={24} />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="font-semibold text-sm text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                      <FileText size={15} className="text-amber-500" />
+                      บันทึก โน้ต ไฮไลต์ และมาตราสำคัญ
+                    </span>
+                    <div className="flex items-center gap-1 text-[11px]">
+                      <span className="px-1.5 py-0.5 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded font-medium">
+                        {counts.notes} โน้ต
+                      </span>
+                      <span className="px-1.5 py-0.5 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded font-medium">
+                        {counts.starred} มาตราติดดาว
+                      </span>
+                      {counts.linkedDekas > 0 && (
+                        <span className="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded font-medium">
+                          {counts.linkedDekas} ฎีกาเชื่อมโยง
+                        </span>
+                      )}
                     </div>
-                    <h4 className="font-bold text-gray-900 dark:text-gray-100 mb-1">กู้คืนข้อมูล</h4>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 h-8">
-                        นำไฟล์ .json ที่เคยสำรองไว้ กลับเข้ามาในระบบ
-                    </p>
-                    <button 
-                        onClick={handleImportClick}
-                        className="w-full py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-lg text-sm font-medium transition-colors"
-                    >
-                        <span>เลือกไฟล์</span>
-                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    ข้อความบันทึกส่วนตัว, ไฮไลต์สีข้อความ, เครื่องหมายดาว และฎีกาที่ผูกไว้ในแต่ละมาตรา
+                  </p>
                 </div>
-            </div>
-            
-            
-              <div className="mt-8 border-t border-gray-100 dark:border-gray-700 pt-6">
-                  <h4 className="text-sm font-bold text-red-600 dark:text-red-400 mb-2">โซนอันตราย (Danger Zone)</h4>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">ล้างข้อมูลทั้งหมดเพื่อให้แอปกลับไปเป็นค่าเริ่มต้น</p>
-                  <button 
-                      onClick={handleReset}
-                      className="w-full sm:w-auto px-4 py-2 bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm font-medium transition-colors"
-                  >
-                      ล้างข้อมูลทั้งหมด (Factory Reset)
-                  </button>
               </div>
 
-              <input 
-                  type="file" 
-                  ref={fileInputRef}
- 
-                onChange={handleFileChange} 
-                accept=".json" 
-                className="hidden" 
-            />
+              {/* Option 2: Memorization SRS */}
+              <div 
+                onClick={() => toggleExportOpt('includeMemorization')}
+                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all select-none ${
+                  exportOpts.includeMemorization 
+                    ? 'bg-white dark:bg-gray-800 border-law-400 dark:border-law-600 shadow-xs' 
+                    : 'bg-white/50 dark:bg-gray-800/40 border-gray-200 dark:border-gray-700 opacity-60'
+                }`}
+              >
+                <div className="pt-0.5 text-law-600 dark:text-law-400">
+                  {exportOpts.includeMemorization ? <CheckSquare size={18} /> : <Square size={18} />}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="font-semibold text-sm text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                      <Brain size={15} className="text-purple-500" />
+                      ชุดท่องสอบและความคืบหน้าความจำ (SRS)
+                    </span>
+                    <div className="flex items-center gap-1 text-[11px]">
+                      <span className="px-1.5 py-0.5 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded font-medium">
+                        {counts.memoDecks} สำรับ
+                      </span>
+                      <span className="px-1.5 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded font-medium">
+                        {counts.memoCards} การ์ดท่องจำ
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    สำรับการ์ดท่องสอบ, รายการมาตราที่เพิ่มเข้าท่องจำ, ระดับความจำ (SRS) และสถิติการทบทวน
+                  </p>
+                </div>
+              </div>
+
+              {/* Option 3: Deka Bookmarks */}
+              <div 
+                onClick={() => toggleExportOpt('includeBookmarks')}
+                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all select-none ${
+                  exportOpts.includeBookmarks 
+                    ? 'bg-white dark:bg-gray-800 border-law-400 dark:border-law-600 shadow-xs' 
+                    : 'bg-white/50 dark:bg-gray-800/40 border-gray-200 dark:border-gray-700 opacity-60'
+                }`}
+              >
+                <div className="pt-0.5 text-law-600 dark:text-law-400">
+                  {exportOpts.includeBookmarks ? <CheckSquare size={18} /> : <Square size={18} />}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="font-semibold text-sm text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                      <Bookmark size={15} className="text-emerald-500" />
+                      บุ๊กมาร์กคำพิพากษาฎีกา
+                    </span>
+                    <span className="px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded font-medium text-[11px]">
+                      {counts.bookmarks} ฎีกาที่บันทึก
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    รายการคำพิพากษาศาลฎีกาที่กดบุ๊กมาร์กจัดเก็บไว้ในระบบค้นหาฎีกา
+                  </p>
+                </div>
+              </div>
+
+              {/* Option 4: Custom Laws & Books */}
+              <div 
+                onClick={() => toggleExportOpt('includeCustomLaws')}
+                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all select-none ${
+                  exportOpts.includeCustomLaws 
+                    ? 'bg-white dark:bg-gray-800 border-law-400 dark:border-law-600 shadow-xs' 
+                    : 'bg-white/50 dark:bg-gray-800/40 border-gray-200 dark:border-gray-700 opacity-60'
+                }`}
+              >
+                <div className="pt-0.5 text-law-600 dark:text-law-400">
+                  {exportOpts.includeCustomLaws ? <CheckSquare size={18} /> : <Square size={18} />}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="font-semibold text-sm text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                      <BookOpen size={15} className="text-blue-500" />
+                      ตัวบทกฎหมายที่แก้ไขหรือสร้างใหม่เอง
+                    </span>
+                    <span className="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded font-medium text-[11px]">
+                      {counts.customLaws} มาตรา
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    ข้อความตัวบทมาตราที่ได้รับการแก้ไขเพิ่มเติม หรือหนังสือตัวบทที่สร้างขึ้นเอง
+                  </p>
+                </div>
+              </div>
+
+              {/* Option 5: App Settings */}
+              <div 
+                onClick={() => toggleExportOpt('includeSettings')}
+                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all select-none ${
+                  exportOpts.includeSettings 
+                    ? 'bg-white dark:bg-gray-800 border-law-400 dark:border-law-600 shadow-xs' 
+                    : 'bg-white/50 dark:bg-gray-800/40 border-gray-200 dark:border-gray-700 opacity-60'
+                }`}
+              >
+                <div className="pt-0.5 text-law-600 dark:text-law-400">
+                  {exportOpts.includeSettings ? <CheckSquare size={18} /> : <Square size={18} />}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="font-semibold text-sm text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                      <SettingsIcon size={15} className="text-gray-500" />
+                      การตั้งค่าแอปและการอ่านออกเสียง
+                    </span>
+                    <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded font-medium text-[11px]">
+                      พร้อมสำรอง
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    ขนาดฟอนต์, รูปแบบตัวอักษร, เสียงอ่านไทยที่เลือก และความเร็วการอ่าน
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Export Trigger Button */}
+            <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {hasAnyExportSelected 
+                  ? `เลือกสำรอง ${Object.values(exportOpts).filter(Boolean).length} จาก 5 หมวดหมู่`
+                  : '⚠️ โปรดเลือกอย่างน้อย 1 หมวดหมู่'}
+              </span>
+              <button 
+                onClick={handleExport}
+                disabled={!hasAnyExportSelected}
+                className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center space-x-2 shadow-xs ${
+                  hasAnyExportSelected
+                    ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white cursor-pointer active:scale-98'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                <Download size={17} />
+                <span>ดาวน์โหลดไฟล์สำรอง (.json)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Import / Restore Section */}
+          <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 sm:p-5 bg-white dark:bg-gray-800">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h4 className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                  <Upload className="text-orange-500" size={18} />
+                  กู้คืนข้อมูล (Restore)
+                </h4>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  เลือกไฟล์ .json ที่สำรองไว้ ระบบจะแสดงข้อมูลสรุปให้คุณตรวจสอบก่อนดำเนินการ
+                </p>
+              </div>
+              <button 
+                onClick={handleImportClick}
+                className="px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-sm font-medium transition-colors flex items-center justify-center space-x-2 shadow-xs flex-shrink-0"
+              >
+                <Upload size={16} />
+                <span>เลือกไฟล์สำรองข้อมูล</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Danger Zone */}
+          <div className="mt-8 border-t border-gray-100 dark:border-gray-700 pt-6">
+            <h4 className="text-sm font-bold text-red-600 dark:text-red-400 mb-1 flex items-center gap-1.5">
+              <AlertTriangle size={16} />
+              โซนอันตราย (Danger Zone)
+            </h4>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              ล้างข้อมูลทั้งหมดในเครื่องเพื่อให้แอปกลับไปเป็นค่าเริ่มต้นเดิมของระบบ
+            </p>
+            <button 
+              onClick={handleReset}
+              className="px-4 py-2 bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
+            >
+              <AlertTriangle size={15} />
+              <span>ล้างข้อมูลทั้งหมด (Factory Reset)</span>
+            </button>
+          </div>
+
+          <input 
+            type="file" 
+            ref={fileInputRef}
+            onChange={handleFileChange} 
+            accept=".json" 
+            className="hidden" 
+          />
         </div>
       </div>
+
+      {/* Pre-restore Inspection Modal */}
+      {pendingRestore && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 max-w-lg w-full overflow-hidden">
+            <div className="p-5 border-b border-gray-100 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-900/50 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 flex items-center justify-center">
+                  <FileCheck size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 dark:text-gray-100 text-base">
+                    ตรวจสอบไฟล์ก่อนกู้คืน
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    พบข้อมูลในไฟล์สำรองดังรายการต่อไปนี้
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setPendingRestore(null)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-3 max-h-[60vh] overflow-y-auto">
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-xl p-3 text-xs text-amber-800 dark:text-amber-200">
+                💡 ข้อมูลใหม่จะถูกนำเข้าและผสาน (Merge) เข้ากับข้อมูลปัจจุบันของคุณโดยอัตโนมัติ
+              </div>
+
+              <div className="space-y-2">
+                {/* Notes & Starred */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-700/40 border border-gray-100 dark:border-gray-700">
+                  <div className="flex items-center gap-2.5 text-sm font-medium text-gray-800 dark:text-gray-200">
+                    <FileText size={16} className="text-amber-500" />
+                    <span>บันทึก โน้ต และไฮไลต์</span>
+                  </div>
+                  <div className="text-right text-xs">
+                    <span className="font-bold text-gray-900 dark:text-gray-100">
+                      {pendingRestore.summary.notesCount} บันทึก
+                    </span>
+                    <span className="text-gray-400 ml-1.5">
+                      ({pendingRestore.summary.starredCount} ดาว, {pendingRestore.summary.linkedDekaCount} ฎีกาเชื่อมโยง)
+                    </span>
+                  </div>
+                </div>
+
+                {/* Memorization */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-700/40 border border-gray-100 dark:border-gray-700">
+                  <div className="flex items-center gap-2.5 text-sm font-medium text-gray-800 dark:text-gray-200">
+                    <Brain size={16} className="text-purple-500" />
+                    <span>ชุดท่องสอบและความจำ (SRS)</span>
+                  </div>
+                  <div className="text-right text-xs">
+                    <span className="font-bold text-gray-900 dark:text-gray-100">
+                      {pendingRestore.summary.memoDecksCount} สำรับ
+                    </span>
+                    <span className="text-gray-400 ml-1.5">
+                      ({pendingRestore.summary.memoItemsCount} การ์ดท่องจำ)
+                    </span>
+                  </div>
+                </div>
+
+                {/* Bookmarks */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-700/40 border border-gray-100 dark:border-gray-700">
+                  <div className="flex items-center gap-2.5 text-sm font-medium text-gray-800 dark:text-gray-200">
+                    <Bookmark size={16} className="text-emerald-500" />
+                    <span>บุ๊กมาร์กคำพิพากษาฎีกา</span>
+                  </div>
+                  <div className="text-right text-xs font-bold text-gray-900 dark:text-gray-100">
+                    {pendingRestore.summary.bookmarksCount} รายการ
+                  </div>
+                </div>
+
+                {/* Custom Laws */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-700/40 border border-gray-100 dark:border-gray-700">
+                  <div className="flex items-center gap-2.5 text-sm font-medium text-gray-800 dark:text-gray-200">
+                    <BookOpen size={16} className="text-blue-500" />
+                    <span>ตัวบทที่แก้ไข/เพิ่มเอง</span>
+                  </div>
+                  <div className="text-right text-xs">
+                    <span className="font-bold text-gray-900 dark:text-gray-100">
+                      {pendingRestore.summary.customLawsCount} มาตรา
+                    </span>
+                    {pendingRestore.summary.customBooksCount > 0 && (
+                      <span className="text-gray-400 ml-1.5">
+                        ({pendingRestore.summary.customBooksCount} เล่ม)
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Settings */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-700/40 border border-gray-100 dark:border-gray-700">
+                  <div className="flex items-center gap-2.5 text-sm font-medium text-gray-800 dark:text-gray-200">
+                    <SettingsIcon size={16} className="text-gray-500" />
+                    <span>การตั้งค่าแอป</span>
+                  </div>
+                  <div className="text-right text-xs font-semibold">
+                    {pendingRestore.summary.hasSettings ? (
+                      <span className="text-green-600 dark:text-green-400 flex items-center gap-1 justify-end">
+                        <Check size={14} /> รวมอยู่ด้วย
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">ไม่มี</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setPendingRestore(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRestore}
+                className="px-5 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-xl shadow-xs transition-colors flex items-center gap-2"
+              >
+                <Check size={16} />
+                <span>ยืนยันการกู้คืนข้อมูล</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Error Modal */}
+      {importError && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-red-200 dark:border-red-800/40 max-w-md w-full p-6 text-center">
+            <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 flex items-center justify-center mx-auto mb-3">
+              <AlertTriangle size={24} />
+            </div>
+            <h3 className="font-bold text-gray-900 dark:text-gray-100 text-lg mb-1">
+              ไม่สามารถอ่านไฟล์ได้
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-5">
+              {importError}
+            </p>
+            <button
+              onClick={() => setImportError(null)}
+              className="px-5 py-2 bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-white text-white dark:text-gray-900 rounded-xl text-sm font-semibold transition-colors"
+            >
+              ปิดหน้าต่าง
+            </button>
+          </div>
+        </div>
+      )}
       
       <div className="text-center text-xs text-gray-400 mt-8 pb-8">
           Thai Law Mate Version 2.1.8

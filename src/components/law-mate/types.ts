@@ -100,8 +100,22 @@ export interface MemorizationStats {
 export interface BackupData {
   version: number;
   timestamp: number;
-  notes: Record<string, UserNote>;
-  customLaws: LawSection[];
+  notes?: Record<string, UserNote>;
+  customLaws?: LawSection[];
+  customBooks?: LawBook[];
+  memoDecks?: MemorizationDeck[];
+  memoItems?: MemorizationItem[];
+  memoStats?: MemorizationStats;
+  bookmarks?: any[];
+  settings?: AppSettings;
+}
+
+export interface ExportOptions {
+  includeNotes: boolean;
+  includeCustomLaws: boolean;
+  includeMemorization: boolean;
+  includeBookmarks: boolean;
+  includeSettings: boolean;
 }
 
 export type FontStyle = 'modern' | 'traditional';

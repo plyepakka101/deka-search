@@ -1,4 +1,4 @@
-import { LawSection, UserNote, BackupData, AppSettings, LawBook } from '../types';
+import { LawSection, UserNote, BackupData, AppSettings, LawBook, ExportOptions, MemorizationDeck, MemorizationItem, MemorizationStats } from '../types';
 import { parseLaws } from './lawParser';
 import { thaiToArabic } from '../utils/textUtils';
 
@@ -13,8 +13,13 @@ export const initLawsData = async () => {
 };
 
 const CUSTOM_LAWS_KEY = 'thai_law_mate_custom_laws';
+const CUSTOM_BOOKS_KEY = 'thai_law_mate_custom_books';
 const NOTES_KEY = 'thai_law_mate_notes';
 const SETTINGS_KEY = 'thai_law_mate_settings';
+const MEMO_DECKS_KEY = 'thai_law_mate_memo_decks';
+const MEMO_ITEMS_KEY = 'thai_law_mate_memo_items';
+const MEMO_STATS_KEY = 'thai_law_mate_memo_stats';
+const DEKA_BOOKMARKS_KEY = 'deka_bookmarks';
 
 export const getBooks = (): LawBook[] => cachedBooks;
 
@@ -181,31 +186,168 @@ export const deleteCustomLaw = (id: string) => {
     restoreOriginalLaw(id);
 }
 
-export const exportData = (): string => {
-  const notes = getNotes();
-  const storedCustom = typeof window !== 'undefined' ? localStorage.getItem(CUSTOM_LAWS_KEY) : null;
-  const customLaws = storedCustom ? JSON.parse(storedCustom) : [];
+export const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
+  includeNotes: true,
+  includeCustomLaws: true,
+  includeMemorization: true,
+  includeBookmarks: true,
+  includeSettings: true,
+};
 
+export const exportData = (options: Partial<ExportOptions> = DEFAULT_EXPORT_OPTIONS): string => {
+  const opts: ExportOptions = { ...DEFAULT_EXPORT_OPTIONS, ...options };
+  
   const backup: BackupData = {
-    version: 1,
+    version: 2,
     timestamp: Date.now(),
-    notes,
-    customLaws
   };
 
+  if (opts.includeNotes) {
+    backup.notes = getNotes();
+  }
+
+  if (opts.includeCustomLaws && typeof window !== 'undefined') {
+    const storedCustom = localStorage.getItem(CUSTOM_LAWS_KEY);
+    backup.customLaws = storedCustom ? JSON.parse(storedCustom) : [];
+
+    const storedCustomBooks = localStorage.getItem(CUSTOM_BOOKS_KEY);
+    if (storedCustomBooks) {
+      backup.customBooks = JSON.parse(storedCustomBooks);
+    }
+  }
+
+  if (opts.includeMemorization && typeof window !== 'undefined') {
+    const decks = localStorage.getItem(MEMO_DECKS_KEY);
+    const items = localStorage.getItem(MEMO_ITEMS_KEY);
+    const stats = localStorage.getItem(MEMO_STATS_KEY);
+    if (decks) backup.memoDecks = JSON.parse(decks);
+    if (items) backup.memoItems = JSON.parse(items);
+    if (stats) backup.memoStats = JSON.parse(stats);
+  }
+
+  if (opts.includeBookmarks && typeof window !== 'undefined') {
+    const bookmarks = localStorage.getItem(DEKA_BOOKMARKS_KEY);
+    if (bookmarks) backup.bookmarks = JSON.parse(bookmarks);
+  }
+
+  if (opts.includeSettings) {
+    backup.settings = getSettings();
+  }
+
   return JSON.stringify(backup, null, 2);
+};
+
+export interface ImportSummary {
+  notesCount: number;
+  starredCount: number;
+  linkedDekaCount: number;
+  customLawsCount: number;
+  customBooksCount: number;
+  memoDecksCount: number;
+  memoItemsCount: number;
+  bookmarksCount: number;
+  hasSettings: boolean;
+}
+
+export const inspectBackupData = (jsonString: string): { valid: boolean; summary?: ImportSummary; error?: string } => {
+  try {
+    const data: BackupData = JSON.parse(jsonString);
+    if (typeof data !== 'object' || data === null) {
+      return { valid: false, error: 'รูปแบบไฟล์ไม่ถูกต้อง' };
+    }
+
+    let notesCount = 0;
+    let starredCount = 0;
+    let linkedDekaCount = 0;
+    if (data.notes && typeof data.notes === 'object') {
+      notesCount = Object.keys(data.notes).length;
+      Object.values(data.notes).forEach(n => {
+        if (n.isHighlighted) starredCount++;
+        if (n.linkedDekaIds && n.linkedDekaIds.length > 0) linkedDekaCount += n.linkedDekaIds.length;
+      });
+    }
+
+    const summary: ImportSummary = {
+      notesCount,
+      starredCount,
+      linkedDekaCount,
+      customLawsCount: Array.isArray(data.customLaws) ? data.customLaws.length : 0,
+      customBooksCount: Array.isArray(data.customBooks) ? data.customBooks.length : 0,
+      memoDecksCount: Array.isArray(data.memoDecks) ? data.memoDecks.length : 0,
+      memoItemsCount: Array.isArray(data.memoItems) ? data.memoItems.length : 0,
+      bookmarksCount: Array.isArray(data.bookmarks) ? data.bookmarks.length : 0,
+      hasSettings: Boolean(data.settings)
+    };
+
+    return { valid: true, summary };
+  } catch (e) {
+    return { valid: false, error: 'ไม่สามารถอ่านไฟล์ JSON ได้' };
+  }
 };
 
 export const importData = (jsonString: string): boolean => {
   if (typeof window === 'undefined') return false;
   try {
     const data: BackupData = JSON.parse(jsonString);
-    if (!data.notes || !Array.isArray(data.customLaws)) {
+    if (typeof data !== 'object' || data === null) {
       console.error("Invalid backup format");
       return false;
     }
-    localStorage.setItem(NOTES_KEY, JSON.stringify(data.notes));
-    localStorage.setItem(CUSTOM_LAWS_KEY, JSON.stringify(data.customLaws));
+
+    // 1. Restore Notes & Highlights & Starred & Linked Deka
+    if (data.notes && typeof data.notes === 'object') {
+      const existing = getNotes();
+      const merged = { ...existing, ...data.notes };
+      localStorage.setItem(NOTES_KEY, JSON.stringify(merged));
+    }
+
+    // 2. Restore Custom Laws & Custom Books
+    if (Array.isArray(data.customLaws)) {
+      const storedCustom = localStorage.getItem(CUSTOM_LAWS_KEY);
+      const existingCustom: LawSection[] = storedCustom ? JSON.parse(storedCustom) : [];
+      const lawMap = new Map<string, LawSection>();
+      existingCustom.forEach(l => lawMap.set(l.id, l));
+      data.customLaws.forEach(l => lawMap.set(l.id, l));
+      localStorage.setItem(CUSTOM_LAWS_KEY, JSON.stringify(Array.from(lawMap.values())));
+    }
+
+    if (Array.isArray(data.customBooks)) {
+      localStorage.setItem(CUSTOM_BOOKS_KEY, JSON.stringify(data.customBooks));
+    }
+
+    // 3. Restore Memorization Decks & Items & Stats
+    if (Array.isArray(data.memoDecks)) {
+      localStorage.setItem(MEMO_DECKS_KEY, JSON.stringify(data.memoDecks));
+    }
+
+    if (Array.isArray(data.memoItems)) {
+      const storedItems = localStorage.getItem(MEMO_ITEMS_KEY);
+      const existingItems: MemorizationItem[] = storedItems ? JSON.parse(storedItems) : [];
+      const itemMap = new Map<string, MemorizationItem>();
+      existingItems.forEach(i => itemMap.set(i.id, i));
+      data.memoItems.forEach(i => itemMap.set(i.id, i));
+      localStorage.setItem(MEMO_ITEMS_KEY, JSON.stringify(Array.from(itemMap.values())));
+    }
+
+    if (data.memoStats) {
+      localStorage.setItem(MEMO_STATS_KEY, JSON.stringify(data.memoStats));
+    }
+
+    // 4. Restore Deka Bookmarks
+    if (Array.isArray(data.bookmarks)) {
+      const storedBookmarks = localStorage.getItem(DEKA_BOOKMARKS_KEY);
+      const existingBookmarks: any[] = storedBookmarks ? JSON.parse(storedBookmarks) : [];
+      const bookmarkMap = new Map<string, any>();
+      existingBookmarks.forEach(b => bookmarkMap.set(b.id, b));
+      data.bookmarks.forEach(b => bookmarkMap.set(b.id, b));
+      localStorage.setItem(DEKA_BOOKMARKS_KEY, JSON.stringify(Array.from(bookmarkMap.values())));
+    }
+
+    // 5. Restore Settings
+    if (data.settings && typeof data.settings === 'object') {
+      saveSettings(data.settings);
+    }
+
     return true;
   } catch (e) {
     console.error("Import failed:", e);
@@ -213,10 +355,21 @@ export const importData = (jsonString: string): boolean => {
   }
 };
 
-export const resetData = () => {
+export const resetData = (options?: { resetNotes?: boolean; resetLaws?: boolean; resetMemo?: boolean; resetBookmarks?: boolean; resetSettings?: boolean }) => {
   if (typeof window === 'undefined') return;
-  localStorage.removeItem(NOTES_KEY);
-  localStorage.removeItem(CUSTOM_LAWS_KEY);
+  const opts = options || { resetNotes: true, resetLaws: true, resetMemo: true, resetBookmarks: true, resetSettings: true };
+  if (opts.resetNotes) localStorage.removeItem(NOTES_KEY);
+  if (opts.resetLaws) {
+    localStorage.removeItem(CUSTOM_LAWS_KEY);
+    localStorage.removeItem(CUSTOM_BOOKS_KEY);
+  }
+  if (opts.resetMemo) {
+    localStorage.removeItem(MEMO_DECKS_KEY);
+    localStorage.removeItem(MEMO_ITEMS_KEY);
+    localStorage.removeItem(MEMO_STATS_KEY);
+  }
+  if (opts.resetBookmarks) localStorage.removeItem(DEKA_BOOKMARKS_KEY);
+  if (opts.resetSettings) localStorage.removeItem(SETTINGS_KEY);
 };
 
 export const getSettings = (): AppSettings => {
