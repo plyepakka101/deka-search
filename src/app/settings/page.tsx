@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useSession, signIn, signOut } from "next-auth/react";
+import { signIn, signOut } from "next-auth/react";
 import Link from "next/link";
 import {
   Settings,
@@ -43,7 +43,8 @@ import {
 import { AppSettings, ExportOptions } from "@/components/law-mate/types";
 
 export default function SettingsPage() {
-  const { data: session } = useSession();
+  const [session, setSession] = useState<any>(null);
+  const [mounted, setMounted] = useState(false);
   const isAdmin = Boolean((session?.user as any)?.isAdmin);
 
   // Tabs
@@ -80,7 +81,7 @@ export default function SettingsPage() {
   const [importError, setImportError] = useState<string | null>(null);
 
   // TTS Voices
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [voices, setVoices] = useState<any[]>([]);
   const [isPlayingTestVoice, setIsPlayingTestVoice] = useState(false);
 
   // Status message
@@ -91,8 +92,18 @@ export default function SettingsPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Load initial settings & counts
+  // Load initial settings & counts & session
   useEffect(() => {
+    setMounted(true);
+    fetch("/api/auth/session")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && Object.keys(data).length > 0) {
+          setSession(data);
+        }
+      })
+      .catch((e) => console.error("Session fetch error:", e));
+
     const saved = getSettings();
     const savedDark = localStorage.getItem("deka_dark_mode");
     const isDark = savedDark !== null ? savedDark === "true" : saved.darkMode;
