@@ -9,7 +9,7 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
+  url      = "file:./dev.db"
 }
 
 model ImportBatch {
@@ -58,3 +58,47 @@ model LawBook {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
+
+model ExamCollection {
+  id          String         @id @default(cuid())
+  title       String         // e.g. "ข้อสอบเนติบัณฑิต ข้อ 7 (กฎหมายล้มละลายและการฟื้นฟูกิจการ)"
+  category    String         // 1 ใน 9 หมวดที่กำหนด
+  year        Int?           // ปี พ.ศ. ของข้อสอบ (เช่น 2545-2562)
+  description String?        // รายละเอียดชุดข้อสอบ
+  source      String?        // แหล่งที่มา (เช่น เนติบัณฑิตยสภา)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  questions   ExamQuestion[]
+
+  @@index([category])
+  @@index([year])
+}
+
+model ExamQuestion {
+  id               String         @id @default(cuid())
+  collectionId     String
+  collection       ExamCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  
+  questionNumber   String         // e.g. "7.1", "7.2"
+  title            String?        // ชื่อเรื่องสั้น (เช่น "การเพิกถอนการขายทอดตลาดทรัพย์จำนอง")
+  facts            String         // ข้อเท็จจริงของโจทย์
+  prompt           String         // คำถามวินิจฉัย (ขึ้นต้นด้วย "ให้วินิจฉัยว่า...")
+  officialAnswer   String         // ธงคำตอบฉบับเต็ม
+  examDate         String?        // e.g. "วันอาทิตย์ที่ 2 มิถุนายน 2545"
+  examYear         Int?           // e.g. 2545
+  
+  category         String         // หมวดกฎหมาย 1 ใน 9 หมวด
+  
+  // JSON metadata arrays
+  keyIssues        String         // JSON Array of strings e.g. ["เจ้าหนี้มีประกัน ม.6, 95", "อำนาจ จพท. ม.110 วรรคท้าย"]
+  relatedSections  String         // JSON Array: [{ law: "พ.ร.บ.ล้มละลาย", section: "6" }]
+  relatedDekas     String         // JSON Array: ["5744/2531", "593/2538", "3283/2532"]
+  
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([category])
+  @@index([collectionId])
+  @@index([examYear])
+}
+

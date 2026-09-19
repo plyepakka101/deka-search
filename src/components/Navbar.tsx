@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { Scale, Menu, X, UserCircle, BookOpen, Bookmark, LogOut, Brain } from "lucide-react";
+import { Scale, Menu, X, UserCircle, BookOpen, Bookmark, LogOut, Brain, GraduationCap } from "lucide-react";
 import { useState } from "react";
 import { signIn, signOut } from "next-auth/react";
 
@@ -23,7 +23,7 @@ export default function Navbar({ session }: { session: any }) {
             </Link>
             
             {/* Desktop Nav */}
-            <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
+            <nav className="hidden md:flex items-center gap-5 text-sm font-medium">
               <Link href="/" className="text-slate-600 hover:text-primary transition-colors">หน้าแรก</Link>
               <Link href="/search?tab=law" className="text-slate-600 hover:text-primary transition-colors">แยกตามกฎหมาย</Link>
               <Link href="/search?tab=year" className="text-slate-600 hover:text-primary transition-colors">แยกตามปี พ.ศ.</Link>
@@ -35,6 +35,10 @@ export default function Navbar({ session }: { session: any }) {
                 <Brain className="w-4 h-4" />
                 ท่องสอบ
               </Link>
+              <Link href="/exams" className="text-indigo-600 hover:text-indigo-700 transition-colors flex items-center gap-1 font-semibold">
+                <GraduationCap className="w-4 h-4" />
+                ฝึกทำข้อสอบ
+              </Link>
               <Link href="/bookmarks" className="text-slate-600 hover:text-primary transition-colors flex items-center gap-1">
                 <Bookmark className="w-4 h-4" />
                 บุ๊กมาร์ก
@@ -45,12 +49,15 @@ export default function Navbar({ session }: { session: any }) {
           <div className="flex items-center gap-4">
             {/* Admin Buttons - Desktop Only */}
             {isAdmin && (
-              <div className="hidden md:flex items-center gap-3">
-                <Link href="/admin/import" className="text-xs px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
+              <div className="hidden md:flex items-center gap-2">
+                <Link href="/admin/import" className="text-xs px-2.5 py-1.5 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
                   นำเข้าคำพิพากษา
                 </Link>
-                <Link href="/admin/import-law" className="text-xs px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
+                <Link href="/admin/import-law" className="text-xs px-2.5 py-1.5 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
                   นำเข้ากฎหมาย
+                </Link>
+                <Link href="/admin/import-exam" className="text-xs px-2.5 py-1.5 rounded-full bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-semibold transition-colors">
+                  นำเข้าข้อสอบ
                 </Link>
               </div>
             )}
@@ -102,6 +109,10 @@ export default function Navbar({ session }: { session: any }) {
               <Brain className="w-6 h-6 text-purple-600" />
               ท่องสอบ (เตรียมสอบ)
             </Link>
+            <Link href="/exams" onClick={() => setIsMenuOpen(false)} className="text-indigo-600 hover:text-indigo-700 transition-colors flex items-center gap-3 font-semibold">
+              <GraduationCap className="w-6 h-6 text-indigo-600" />
+              ฝึกทำข้อสอบ (อัตนัย)
+            </Link>
             <Link href="/bookmarks" onClick={() => setIsMenuOpen(false)} className="text-slate-600 hover:text-primary transition-colors flex items-center gap-3">
               <Bookmark className="w-6 h-6" />
               บุ๊กมาร์ก
@@ -111,6 +122,7 @@ export default function Navbar({ session }: { session: any }) {
               <>
                 <Link href="/admin/import" onClick={() => setIsMenuOpen(false)} className="text-slate-600 hover:text-primary transition-colors">นำเข้าคำพิพากษา</Link>
                 <Link href="/admin/import-law" onClick={() => setIsMenuOpen(false)} className="text-slate-600 hover:text-primary transition-colors">นำเข้ากฎหมาย</Link>
+                <Link href="/admin/import-exam" onClick={() => setIsMenuOpen(false)} className="text-indigo-600 hover:text-indigo-800 font-semibold transition-colors">นำเข้าข้อสอบ</Link>
               </>
             )}
             
