@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { LawSection, UserNote, AppSettings, TextHighlight } from '../types';
 import { getOriginalLaw, getBooks } from '../services/dataService';
-import { BookOpen, Edit, Save, Trash2, ExternalLink, Star, Share2, Volume2, Square, Scale, History, Search, Highlighter, X, Brain, Play } from 'lucide-react';
+import { BookOpen, Edit, Save, Trash2, ExternalLink, Star, Share2, Volume2, Square, Scale, History, Search, Highlighter, X, Brain, Play, GraduationCap, ChevronRight } from 'lucide-react';
 import { SECTION_REF_REGEX, thaiToArabic, createHighlightRegex } from '../utils/textUtils';
 import { DiffView } from './DiffView';
 import { MemorizePlayer } from './MemorizePlayer';
@@ -46,6 +46,31 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
   // Linked Decisions
   const [linkedDecisions, setLinkedDecisions] = useState<any[]>([]);
   const [showLinkedDecisions, setShowLinkedDecisions] = useState(false);
+
+  // Related Exam Questions
+  const [relatedExams, setRelatedExams] = useState<any[]>([]);
+  const [showRelatedExams, setShowRelatedExams] = useState(false);
+  const [isLoadingExams, setIsLoadingExams] = useState(false);
+  const [hasFetchedExams, setHasFetchedExams] = useState(false);
+
+  const handleToggleRelatedExams = async () => {
+    if (!showRelatedExams && !hasFetchedExams) {
+      setIsLoadingExams(true);
+      try {
+        const res = await fetch(`/api/exams/by-law?section=${encodeURIComponent(law.sectionNumber)}`);
+        const data = await res.json();
+        if (data.success) {
+          setRelatedExams(data.questions || []);
+        }
+      } catch (e) {
+        console.error("Failed to fetch related exams", e);
+      } finally {
+        setIsLoadingExams(false);
+        setHasFetchedExams(true);
+      }
+    }
+    setShowRelatedExams(!showRelatedExams);
+  };
 
   // Memorization State
   const [memoItems, setMemoItems] = useState(getLocalItems());
@@ -788,6 +813,20 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
             </button>
           </div>
 
+          {/* Related Exams Button */}
+          <button 
+            onClick={handleToggleRelatedExams}
+            className={`flex items-center space-x-1.5 text-xs sm:text-sm px-3 py-1.5 rounded-xl border transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${
+              showRelatedExams 
+                ? 'text-indigo-800 bg-indigo-100 border-indigo-300 dark:text-indigo-200 dark:bg-indigo-950 font-bold' 
+                : 'text-indigo-700 bg-indigo-50/90 hover:bg-indigo-100 border-indigo-200/70 dark:text-indigo-300 dark:bg-indigo-950/60 dark:border-indigo-800/60 font-semibold'
+            }`}
+            title="ค้นหาข้อสอบที่เกี่ยวข้องกับมาตรานี้"
+          >
+            <GraduationCap size={15} className="text-indigo-600 dark:text-indigo-400" />
+            <span>{hasFetchedExams ? `ข้อสอบ (${relatedExams.length})` : 'ข้อสอบ'}</span>
+          </button>
+
           {(law.sourceUrl || officialUrl) && (
             <a 
               href={law.sourceUrl || officialUrl}
@@ -883,6 +922,73 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Related Exam Questions Area */}
+        {showRelatedExams && (
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 animate-in fade-in duration-200">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 font-sans">
+                <GraduationCap className="text-indigo-600 dark:text-indigo-400 w-4 h-4" />
+                <span>ข้อสอบอัตนัยที่เกี่ยวข้องกับมาตรา {law.sectionNumber}</span>
+              </h4>
+              <button
+                onClick={() => setShowRelatedExams(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 cursor-pointer"
+                title="ปิด"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            {isLoadingExams ? (
+              <div className="py-6 text-center text-xs text-slate-500 dark:text-slate-400 flex items-center justify-center gap-2 font-sans">
+                <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                <span>กำลังค้นหาข้อสอบที่เกี่ยวข้อง...</span>
+              </div>
+            ) : relatedExams.length === 0 ? (
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 text-center text-xs text-slate-500 dark:text-slate-400 border border-slate-200/60 dark:border-slate-800 font-sans">
+                ยังไม่มีข้อสอบที่อ้างอิงมาตรา {law.sectionNumber} ในคลังระบบขณะนี้
+              </div>
+            ) : (
+              <div className="space-y-2.5 font-sans">
+                {relatedExams.map((exam) => (
+                  <div
+                    key={exam.id}
+                    className="p-3.5 bg-indigo-50/50 dark:bg-indigo-950/30 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-indigo-300 transition-colors shadow-2xs"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="px-2 py-0.5 bg-indigo-600 text-white font-bold text-[11px] rounded shadow-2xs">
+                          ข้อ {exam.questionNumber}
+                        </span>
+                        <span className="text-[11px] text-indigo-700 dark:text-indigo-300 font-medium">
+                          {exam.category} {exam.examYear ? `(ปี ${exam.examYear})` : ''}
+                        </span>
+                      </div>
+                      <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 line-clamp-1">
+                        {exam.collectionTitle || exam.title || `ข้อสอบข้อ ${exam.questionNumber}`}
+                      </p>
+                      {exam.factsPreview && (
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5 leading-relaxed">
+                          {exam.factsPreview}
+                        </p>
+                      )}
+                    </div>
+                    <a
+                      href={`/exams/${exam.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-2xs transition-colors shrink-0 cursor-pointer"
+                    >
+                      <span>เริ่มทำข้อสอบ</span>
+                      <ChevronRight size={14} />
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

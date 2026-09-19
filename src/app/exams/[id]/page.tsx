@@ -6,8 +6,15 @@ import { useParams } from 'next/navigation';
 import { 
   ArrowLeft, Clock, Play, Pause, RotateCcw, CheckCircle2, 
   AlertCircle, Scale, BookOpen, ChevronRight, X, ExternalLink, 
-  Sparkles, CheckSquare, Square, Eye, FileText, Check
+  Sparkles, CheckSquare, Square, Eye, FileText, Check, Save
 } from 'lucide-react';
+import { 
+  saveExamAttempt, 
+  getExamAttempts, 
+  getReviewItems, 
+  ExamAttempt, 
+  ExamReviewItem 
+} from '@/services/examService';
 
 export default function ExamRoomPage() {
   const params = useParams();
@@ -21,6 +28,11 @@ export default function ExamRoomPage() {
   const [userDraft, setUserDraft] = useState('');
   const [isAnswerRevealed, setIsAnswerRevealed] = useState(false);
   const [checkedIssues, setCheckedIssues] = useState<Record<number, boolean>>({});
+
+  // SRS and Attempts state
+  const [pastAttempts, setPastAttempts] = useState<ExamAttempt[]>([]);
+  const [currentReviewItem, setCurrentReviewItem] = useState<ExamReviewItem | null>(null);
+  const [savedSuccessMessage, setSavedSuccessMessage] = useState<string | null>(null);
 
   // Timer state (in seconds)
   const [timerSeconds, setTimerSeconds] = useState(0);
@@ -51,6 +63,13 @@ export default function ExamRoomPage() {
           if (savedRevealed === 'true') setIsAnswerRevealed(true);
           const savedIssues = localStorage.getItem(`deka_exam_issues_${id}`);
           if (savedIssues) setCheckedIssues(JSON.parse(savedIssues));
+
+          // Load past attempts & SRS status
+          const attempts = getExamAttempts(id);
+          setPastAttempts(attempts);
+          const reviews = getReviewItems();
+          const foundRev = reviews.find(r => r.questionId === id);
+          if (foundRev) setCurrentReviewItem(foundRev);
         }
       } catch (err: any) {
         console.error(err);
@@ -100,6 +119,35 @@ export default function ExamRoomPage() {
     if (typeof window !== 'undefined') {
       localStorage.setItem(`deka_exam_issues_${id}`, JSON.stringify(updated));
     }
+  };
+
+  const handleSaveEvaluation = () => {
+    if (!question) return;
+    saveExamAttempt({
+      questionId: id,
+      questionNumber: question.questionNumber,
+      questionTitle: question.title,
+      category: question.category,
+      userDraft,
+      timeSpentSeconds: timerSeconds,
+      checkedIssues,
+      totalIssuesCount,
+      checkedCount,
+      scorePercent,
+    });
+
+    const updatedAttempts = getExamAttempts(id);
+    setPastAttempts(updatedAttempts);
+    const reviews = getReviewItems();
+    const foundRev = reviews.find(r => r.questionId === id);
+    if (foundRev) setCurrentReviewItem(foundRev);
+
+    setSavedSuccessMessage(
+      scorePercent >= 80
+        ? `บันทึกการประเมินแล้ว! คุณจับประเด็นได้ยอดเยี่ยม (${scorePercent}%) เลื่อนระดับสู่ Box ${foundRev?.srsBox || 2}`
+        : `บันทึกการประเมินแล้ว! ตกประเด็นสำคัญ (${scorePercent}%) ระบบส่งเข้าคลังทบทวน (นัดหมายทำซ้ำพรุ่งนี้)`
+    );
+    setTimeout(() => setSavedSuccessMessage(null), 5000);
   };
 
   const handleResetExam = () => {
@@ -225,6 +273,18 @@ export default function ExamRoomPage() {
                   {question.examYear && (
                     <span className="text-xs font-semibold px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-md">
                       พ.ศ. {question.examYear}
+                    </span>
+                  )}
+                  {currentReviewItem && (
+                    <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 border ${
+                      currentReviewItem.srsBox >= 5 
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                        : 'bg-purple-50 text-purple-700 border-purple-200'
+                    }`}>
+                      <span>Box {currentReviewItem.srsBox}</span>
+                      <span className="font-normal opacity-85">
+                        {currentReviewItem.srsBox >= 5 ? '• แม่นยำแล้ว' : `• นัดทบทวน ${currentReviewItem.nextReviewDate}`}
+                      </span>
                     </span>
                   )}
                 </div>
@@ -389,6 +449,74 @@ export default function ExamRoomPage() {
                     );
                   })}
                 </div>
+
+                {/* Score Gauge & Save Button */}
+                <div className="space-y-3 pt-2 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                  <div className="flex items-center justify-between text-xs mb-1 font-semibold">
+                    <span className="text-slate-600">เกณฑ์ความแม่นยำ:</span>
+                    <span className={scorePercent >= 80 ? 'text-emerald-700 font-bold' : 'text-amber-700 font-bold'}>
+                      {scorePercent >= 80 ? '✓ ผ่านเกณฑ์จับประเด็น (>= 80%)' : '⚠️ ตกประเด็นสำคัญ (ต่ำกว่า 80%)'}
+                    </span>
+                  </div>
+
+                  <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-300 ${
+                        scorePercent >= 80 ? 'bg-emerald-500' : scorePercent >= 50 ? 'bg-amber-500' : 'bg-rose-500'
+                      }`}
+                      style={{ width: `${scorePercent}%` }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
+                    <div className="text-[11px] text-slate-500">
+                      {currentReviewItem ? (
+                        <span>สถานะปัจจุบัน: <strong>Box {currentReviewItem.srsBox}</strong> ({currentReviewItem.attemptCount} ครั้ง)</span>
+                      ) : (
+                        <span>ยังไม่เคยบันทึกประเมินข้อนี้</span>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={handleSaveEvaluation}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer active:scale-98"
+                    >
+                      <Save size={14} />
+                      <span>บันทึกผลการประเมิน & จัดคิวทบทวน</span>
+                    </button>
+                  </div>
+
+                  {savedSuccessMessage && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-800 flex items-center gap-2 animate-in fade-in">
+                      <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0" />
+                      <span>{savedSuccessMessage}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Past Attempts History Summary */}
+                {pastAttempts.length > 0 && (
+                  <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs">
+                    <div className="font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                      <span>ประวัติการฝึกทำข้อนี้ ({pastAttempts.length} ครั้ง)</span>
+                      <span className="text-slate-400 font-normal">ล่าสุด {new Date(pastAttempts[0].completedAt).toLocaleDateString('th-TH')}</span>
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      {pastAttempts.slice(0, 5).map((att, i) => (
+                        <span
+                          key={att.id || i}
+                          className={`px-2 py-0.5 rounded-md font-bold text-[11px] border ${
+                            att.scorePercent >= 80
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}
+                        >
+                          ครั้งที่ {pastAttempts.length - i}: {att.scorePercent}%
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Official Answer Box */}
                 <div className="space-y-2 pt-4 border-t border-slate-100">

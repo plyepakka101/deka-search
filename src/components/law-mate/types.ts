@@ -107,6 +107,8 @@ export interface BackupData {
   memoItems?: MemorizationItem[];
   memoStats?: MemorizationStats;
   bookmarks?: any[];
+  examAttempts?: any[];
+  examReviews?: any[];
   settings?: AppSettings;
 }
 
@@ -115,6 +117,7 @@ export interface ExportOptions {
   includeCustomLaws: boolean;
   includeMemorization: boolean;
   includeBookmarks: boolean;
+  includeExamHistory?: boolean;
   includeSettings: boolean;
 }
 

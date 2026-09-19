@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Scale, FileText, User, Gavel, Building2, MapPin } from "lucide-react";
+import { ArrowLeft, Scale, FileText, User, Gavel, Building2, MapPin, GraduationCap, ChevronRight } from "lucide-react";
 import PrintButton from "@/components/PrintButton";
 import BookmarkButton from "@/components/BookmarkButton";
 import { TextWithLawLinks } from "@/components/TextWithLawLinks";
@@ -22,6 +22,25 @@ export default async function DecisionDetailPage({ params }: { params: Promise<{
   }
 
   const books = await getLawBooksMeta();
+
+  // Find if this Deka decision has ever been cited in any ExamQuestion
+  const relatedExams = await prisma.examQuestion.findMany({
+    where: {
+      relatedDekas: {
+        contains: decision.decisionNumber
+      }
+    },
+    include: {
+      collection: {
+        select: {
+          title: true,
+          source: true,
+          year: true
+        }
+      }
+    },
+    take: 5
+  });
 
   return (
     <>
@@ -99,6 +118,54 @@ export default async function DecisionDetailPage({ params }: { params: Promise<{
         </div>
 
         <div className="space-y-10" style={{ fontSize: 'var(--content-font-size, 16px)' }}>
+          {/* Exam Spotlight Banner */}
+          {relatedExams.length > 0 && (
+            <div className="p-5 sm:p-6 bg-gradient-to-br from-indigo-50/90 via-purple-50/70 to-amber-50/50 rounded-2xl border border-indigo-200/80 shadow-xs">
+              <div className="flex items-start gap-3.5">
+                <div className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-xs shrink-0 mt-0.5">
+                  <GraduationCap className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-md">
+                      คลังข้อสอบอัตนัย
+                    </span>
+                    <span className="text-xs text-slate-500 font-medium">
+                      คำพิพากษานี้เคยถูกนำไปออกข้อสอบ ({relatedExams.length} ข้อ)
+                    </span>
+                  </div>
+                  <h4 className="text-base font-bold text-slate-900 leading-snug">
+                    คำพิพากษาศาลฎีกานี้เป็นประเด็นหลักในข้อสอบ
+                  </h4>
+                  <div className="mt-3 space-y-2">
+                    {relatedExams.map((exam) => (
+                      <div
+                        key={exam.id}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-white/90 rounded-xl border border-indigo-100 hover:border-indigo-300 transition-all shadow-2xs"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 font-bold text-xs rounded border border-indigo-200/60 shrink-0">
+                            ข้อ {exam.questionNumber}
+                          </span>
+                          <span className="text-xs text-slate-800 font-semibold truncate">
+                            {exam.collection?.title || exam.title || `ข้อสอบข้อ ${exam.questionNumber}`}
+                          </span>
+                        </div>
+                        <Link
+                          href={`/exams/${exam.id}`}
+                          className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-2xs transition-colors shrink-0"
+                        >
+                          <span>ฝึกทำข้อสอบข้อนี้</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {decision.shortSummary && (
             <section>
               <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">

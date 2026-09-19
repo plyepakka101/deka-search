@@ -186,11 +186,15 @@ export const deleteCustomLaw = (id: string) => {
     restoreOriginalLaw(id);
 }
 
+const EXAM_ATTEMPTS_KEY = 'deka_exam_attempts';
+const EXAM_REVIEWS_KEY = 'deka_exam_reviews';
+
 export const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
   includeNotes: true,
   includeCustomLaws: true,
   includeMemorization: true,
   includeBookmarks: true,
+  includeExamHistory: true,
   includeSettings: true,
 };
 
@@ -230,6 +234,13 @@ export const exportData = (options: Partial<ExportOptions> = DEFAULT_EXPORT_OPTI
     if (bookmarks) backup.bookmarks = JSON.parse(bookmarks);
   }
 
+  if (opts.includeExamHistory && typeof window !== 'undefined') {
+    const attempts = localStorage.getItem(EXAM_ATTEMPTS_KEY);
+    const reviews = localStorage.getItem(EXAM_REVIEWS_KEY);
+    if (attempts) backup.examAttempts = JSON.parse(attempts);
+    if (reviews) backup.examReviews = JSON.parse(reviews);
+  }
+
   if (opts.includeSettings) {
     backup.settings = getSettings();
   }
@@ -246,6 +257,8 @@ export interface ImportSummary {
   memoDecksCount: number;
   memoItemsCount: number;
   bookmarksCount: number;
+  examAttemptsCount: number;
+  examReviewsCount: number;
   hasSettings: boolean;
 }
 
@@ -276,6 +289,8 @@ export const inspectBackupData = (jsonString: string): { valid: boolean; summary
       memoDecksCount: Array.isArray(data.memoDecks) ? data.memoDecks.length : 0,
       memoItemsCount: Array.isArray(data.memoItems) ? data.memoItems.length : 0,
       bookmarksCount: Array.isArray(data.bookmarks) ? data.bookmarks.length : 0,
+      examAttemptsCount: Array.isArray(data.examAttempts) ? data.examAttempts.length : 0,
+      examReviewsCount: Array.isArray(data.examReviews) ? data.examReviews.length : 0,
       hasSettings: Boolean(data.settings)
     };
 
@@ -343,7 +358,26 @@ export const importData = (jsonString: string): boolean => {
       localStorage.setItem(DEKA_BOOKMARKS_KEY, JSON.stringify(Array.from(bookmarkMap.values())));
     }
 
-    // 5. Restore Settings
+    // 5. Restore Exam Attempts & Reviews
+    if (Array.isArray(data.examAttempts)) {
+      const storedAttempts = localStorage.getItem(EXAM_ATTEMPTS_KEY);
+      const existingAttempts: any[] = storedAttempts ? JSON.parse(storedAttempts) : [];
+      const attemptMap = new Map<string, any>();
+      existingAttempts.forEach(a => attemptMap.set(a.id, a));
+      data.examAttempts.forEach(a => attemptMap.set(a.id, a));
+      localStorage.setItem(EXAM_ATTEMPTS_KEY, JSON.stringify(Array.from(attemptMap.values())));
+    }
+
+    if (Array.isArray(data.examReviews)) {
+      const storedReviews = localStorage.getItem(EXAM_REVIEWS_KEY);
+      const existingReviews: any[] = storedReviews ? JSON.parse(storedReviews) : [];
+      const reviewMap = new Map<string, any>();
+      existingReviews.forEach(r => reviewMap.set(r.questionId, r));
+      data.examReviews.forEach(r => reviewMap.set(r.questionId, r));
+      localStorage.setItem(EXAM_REVIEWS_KEY, JSON.stringify(Array.from(reviewMap.values())));
+    }
+
+    // 6. Restore Settings
     if (data.settings && typeof data.settings === 'object') {
       saveSettings(data.settings);
     }
@@ -355,9 +389,9 @@ export const importData = (jsonString: string): boolean => {
   }
 };
 
-export const resetData = (options?: { resetNotes?: boolean; resetLaws?: boolean; resetMemo?: boolean; resetBookmarks?: boolean; resetSettings?: boolean }) => {
+export const resetData = (options?: { resetNotes?: boolean; resetLaws?: boolean; resetMemo?: boolean; resetBookmarks?: boolean; resetExamHistory?: boolean; resetSettings?: boolean }) => {
   if (typeof window === 'undefined') return;
-  const opts = options || { resetNotes: true, resetLaws: true, resetMemo: true, resetBookmarks: true, resetSettings: true };
+  const opts = options || { resetNotes: true, resetLaws: true, resetMemo: true, resetBookmarks: true, resetExamHistory: true, resetSettings: true };
   if (opts.resetNotes) localStorage.removeItem(NOTES_KEY);
   if (opts.resetLaws) {
     localStorage.removeItem(CUSTOM_LAWS_KEY);
@@ -369,6 +403,10 @@ export const resetData = (options?: { resetNotes?: boolean; resetLaws?: boolean;
     localStorage.removeItem(MEMO_STATS_KEY);
   }
   if (opts.resetBookmarks) localStorage.removeItem(DEKA_BOOKMARKS_KEY);
+  if (opts.resetExamHistory) {
+    localStorage.removeItem(EXAM_ATTEMPTS_KEY);
+    localStorage.removeItem(EXAM_REVIEWS_KEY);
+  }
   if (opts.resetSettings) localStorage.removeItem(SETTINGS_KEY);
 };
 
