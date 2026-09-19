@@ -95,11 +95,27 @@ export default function SettingsPage() {
   // Load initial settings & counts & session
   useEffect(() => {
     setMounted(true);
+
+    // Check URL query parameter for tab selection (e.g. /settings?tab=admin)
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      if (tabParam && ["appearance", "tts", "data", "admin", "account"].includes(tabParam)) {
+        setActiveTab(tabParam as any);
+      }
+    }
+
     fetch("/api/auth/session")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data && Object.keys(data).length > 0) {
           setSession(data);
+          if (typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get("tab") === "admin" && Boolean((data?.user as any)?.isAdmin)) {
+              setActiveTab("admin");
+            }
+          }
         }
       })
       .catch((e) => console.error("Session fetch error:", e));

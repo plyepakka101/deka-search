@@ -4,34 +4,20 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
   Scale, Menu, X, UserCircle, BookOpen, Bookmark, LogOut, 
-  Brain, GraduationCap, ChevronDown, Shield, Home, Calendar, 
-  FileText, Sparkles, Database, PlusCircle, Settings
+  Brain, GraduationCap, Shield, Home, Calendar, 
+  FileText, Sparkles, Settings
 } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { signIn, signOut } from "next-auth/react";
 
 export default function Navbar({ session }: { session: any }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isAdminDropdownOpen, setIsAdminDropdownOpen] = useState(false);
-  const adminDropdownRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const isAdmin = session?.user?.isAdmin;
-
-  // Close admin dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (adminDropdownRef.current && !adminDropdownRef.current.contains(event.target as Node)) {
-        setIsAdminDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   // Close mobile drawer on route change
   useEffect(() => {
     setIsMenuOpen(false);
-    setIsAdminDropdownOpen(false);
   }, [pathname]);
 
   // Lock body scroll when mobile menu is open
@@ -205,53 +191,6 @@ export default function Navbar({ session }: { session: any }) {
 
           {/* Right Action Bar */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Admin Dropdown - Compact & Sleek for Desktop/Tablets */}
-            {isAdmin && (
-              <div className="relative hidden md:block" ref={adminDropdownRef}>
-                <button
-                  onClick={() => setIsAdminDropdownOpen(!isAdminDropdownOpen)}
-                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer border border-slate-200"
-                  title="จัดการข้อมูลระบบ"
-                >
-                  <Shield size={14} className="text-indigo-600" />
-                  <span className="whitespace-nowrap">นำเข้าข้อมูล</span>
-                  <ChevronDown size={14} className={`text-slate-400 transition-transform ${isAdminDropdownOpen ? 'rotate-180' : ''}`} />
-                </button>
-
-                {isAdminDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                    <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 mb-1">
-                      เมนูผู้ดูแลระบบ
-                    </div>
-                    <Link
-                      href="/admin/import"
-                      onClick={() => setIsAdminDropdownOpen(false)}
-                      className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-primary transition-colors"
-                    >
-                      <Database size={15} className="text-emerald-500" />
-                      <span>นำเข้าคำพิพากษาฎีกา</span>
-                    </Link>
-                    <Link
-                      href="/admin/import-law"
-                      onClick={() => setIsAdminDropdownOpen(false)}
-                      className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-primary transition-colors"
-                    >
-                      <BookOpen size={15} className="text-blue-500" />
-                      <span>นำเข้าตัวบทกฎหมาย</span>
-                    </Link>
-                    <Link
-                      href="/admin/import-exam"
-                      onClick={() => setIsAdminDropdownOpen(false)}
-                      className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100 transition-colors"
-                    >
-                      <GraduationCap size={15} className="text-indigo-600" />
-                      <span>นำเข้าข้อสอบอัตนัย</span>
-                    </Link>
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* Settings Link */}
             <Link
               href="/settings"
@@ -441,36 +380,21 @@ export default function Navbar({ session }: { session: any }) {
               {/* Group 3: แอดมิน (Admin Only) */}
               {isAdmin && (
                 <div className="pt-2 border-t border-slate-100">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 px-2 flex items-center gap-1.5">
-                    <Shield size={13} className="text-indigo-500" />
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-amber-500 mb-2 px-2 flex items-center gap-1.5">
+                    <Shield size={13} className="text-amber-500" />
                     <span>เมนูผู้ดูแลระบบ</span>
                   </div>
-                  <div className="space-y-1">
-                    <Link
-                      href="/admin/import"
-                      onClick={() => setIsMenuOpen(false)}
-                      className="flex items-center gap-3 px-3.5 py-2 rounded-xl text-slate-700 hover:bg-slate-50 text-xs font-medium transition-colors"
-                    >
-                      <Database size={15} className="text-emerald-500" />
-                      <span>นำเข้าคำพิพากษาฎีกา</span>
-                    </Link>
-                    <Link
-                      href="/admin/import-law"
-                      onClick={() => setIsMenuOpen(false)}
-                      className="flex items-center gap-3 px-3.5 py-2 rounded-xl text-slate-700 hover:bg-slate-50 text-xs font-medium transition-colors"
-                    >
-                      <BookOpen size={15} className="text-blue-500" />
-                      <span>นำเข้าตัวบทกฎหมาย</span>
-                    </Link>
-                    <Link
-                      href="/admin/import-exam"
-                      onClick={() => setIsMenuOpen(false)}
-                      className="flex items-center gap-3 px-3.5 py-2 rounded-xl text-indigo-700 bg-indigo-50 font-semibold text-xs transition-colors"
-                    >
-                      <PlusCircle size={15} className="text-indigo-600" />
-                      <span>นำเข้าข้อสอบอัตนัย</span>
-                    </Link>
-                  </div>
+                  <Link
+                    href="/settings?tab=admin"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-amber-50/80 border border-amber-200/60 text-amber-900 font-semibold text-xs hover:bg-amber-100 transition-colors"
+                  >
+                    <Shield size={16} className="text-amber-600 shrink-0" />
+                    <div>
+                      <div className="font-bold">จัดการระบบ & นำเข้าข้อมูล</div>
+                      <div className="text-[11px] text-amber-700 font-normal">นำเข้าฎีกา, ตัวบท, ข้อสอบ และซ่อมแซมข้อมูล</div>
+                    </div>
+                  </Link>
                 </div>
               )}
             </div>
