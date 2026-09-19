@@ -191,21 +191,8 @@ export default function Navbar({ session }: { session: any }) {
 
           {/* Right Action Bar */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Settings Link */}
-            <Link
-              href="/settings"
-              className={`p-2 rounded-xl transition-colors ${
-                isActive("/settings")
-                  ? "text-primary font-bold bg-primary/10"
-                  : "text-slate-500 hover:text-primary hover:bg-slate-100"
-              }`}
-              title="การตั้งค่าระบบ"
-            >
-              <Settings className="w-5 h-5" />
-            </Link>
-
             {/* User Session Avatar / Sign In */}
-            <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-200">
+            <div className="hidden sm:flex items-center gap-2">
               {session ? (
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 p-1 pr-2.5 rounded-full border border-slate-200 transition-colors">
