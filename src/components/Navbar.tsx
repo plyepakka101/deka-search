@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { 
   Scale, Menu, X, UserCircle, BookOpen, Bookmark, LogOut, 
   Brain, GraduationCap, ChevronDown, Shield, Home, Calendar, 
-  FileText, Sparkles, Database, PlusCircle
+  FileText, Sparkles, Database, PlusCircle, Settings
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { signIn, signOut } from "next-auth/react";
@@ -230,6 +230,19 @@ export default function Navbar({ session }: { session: any }) {
               </div>
             )}
 
+            {/* Settings Link */}
+            <Link
+              href="/settings"
+              className={`p-2 rounded-xl transition-colors ${
+                isActive("/settings")
+                  ? "text-primary font-bold bg-primary/10"
+                  : "text-slate-500 hover:text-primary hover:bg-slate-100"
+              }`}
+              title="การตั้งค่าระบบ"
+            >
+              <Settings className="w-5 h-5" />
+            </Link>
+
             {/* User Session Avatar / Sign In */}
             <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-200">
               {session ? (
@@ -386,6 +399,18 @@ export default function Navbar({ session }: { session: any }) {
                     <div>
                       <div className="font-bold">ฝึกทำข้อสอบอัตนัย</div>
                       <div className="text-xs text-indigo-600 font-normal">ข้อสอบเนติฯ พร้อมตรวจประเด็นและอ่านฎีกา</div>
+                    </div>
+                  </Link>
+
+                  <Link
+                    href="/settings"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-700 hover:text-primary hover:bg-slate-50 font-medium text-sm transition-colors border border-slate-100"
+                  >
+                    <Settings size={18} className="text-slate-500 flex-shrink-0" />
+                    <div>
+                      <div className="font-semibold text-slate-800">การตั้งค่าระบบ</div>
+                      <div className="text-xs text-slate-400">ขนาดฟอนต์ โหมดมืด สำรองข้อมูล</div>
                     </div>
                   </Link>
                 </div>

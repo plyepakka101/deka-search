@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme inline {
   --font-inter: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-thai: var(--font-noto-sans-thai), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
@@ -10,7 +12,13 @@
 }
 
 @layer base {
+  :root {
+    --content-font-size: 16px;
+  }
   body {
     @apply font-thai bg-slate-50 text-slate-900 antialiased;
+  }
+  .dark body {
+    @apply bg-slate-950 text-slate-100;
   }
 }

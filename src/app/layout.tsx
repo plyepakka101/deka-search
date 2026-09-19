@@ -24,6 +24,7 @@ export const viewport = {
 
 import { auth } from "@/auth";
 import Navbar from "@/components/Navbar";
+import ThemeInitializer from "@/components/ThemeInitializer";
 
 export default async function RootLayout({
   children,
@@ -36,7 +37,8 @@ export default async function RootLayout({
       lang="th"
       className={`${inter.variable} ${notoSansThai.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col font-thai bg-slate-50 text-slate-900">
+      <body className="min-h-full flex flex-col font-thai bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-200">
+        <ThemeInitializer />
         <Navbar session={session} />
         {children}
       </body>

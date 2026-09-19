@@ -239,68 +239,75 @@ const App: React.FC = () => {
               if(targetView !== ViewState.SEARCH) setSearchQuery('');
           }
       }}
-      className={`flex flex-col items-center justify-center w-full py-2 space-y-1 transition-colors ${view === targetView ? 'text-law-600 dark:text-law-400' : 'text-gray-400 dark:text-gray-500 hover:text-law-500'}`}
+      className={`flex flex-col items-center justify-center w-full py-2 space-y-1 transition-colors cursor-pointer ${view === targetView ? 'text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
     >
-      <Icon size={24} strokeWidth={view === targetView ? 2.5 : 2} />
+      <Icon size={22} strokeWidth={view === targetView ? 2.5 : 2} />
       <span className="text-[10px] font-medium">{label}</span>
     </button>
   );
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">
-        <Loader2 className="w-8 h-8 text-law-500 animate-spin mb-4" />
-        <p className="text-gray-500 font-medium">กำลังโหลดฐานข้อมูลกฎหมาย...</p>
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center">
+        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-4" />
+        <p className="text-slate-500 dark:text-slate-400 font-medium">กำลังโหลดฐานข้อมูลกฎหมาย...</p>
       </div>
     );
   }
 
   return (
     <HashRouter>
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24 md:pb-0 flex flex-col md:flex-row transition-colors duration-200">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 pb-24 md:pb-0 flex flex-col md:flex-row transition-colors duration-200">
         
         {/* Sidebar for Desktop */}
-        <aside className="hidden md:flex flex-col w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-screen sticky top-0">
-          <div className="p-6 flex items-center space-x-3 border-b border-gray-100 dark:border-gray-700">
-            <div className="bg-law-600 text-white p-2 rounded-lg">
-              <Scale size={24} />
+        <aside className="hidden md:flex flex-col w-64 bg-white dark:bg-slate-900 border-r border-slate-200/80 dark:border-slate-800 h-[calc(100vh-4rem)] sticky top-16 z-20">
+          <div className="p-5 flex items-center space-x-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="bg-indigo-600 text-white p-2 rounded-xl shadow-2xs">
+              <Scale size={20} />
             </div>
-            <h1 className="text-xl font-bold text-law-900 dark:text-law-100 font-sans">Thai Law Mate</h1>
+            <div>
+              <h1 className="text-base font-bold text-slate-900 dark:text-white font-sans leading-tight">
+                Thai Law Mate
+              </h1>
+              <span className="text-[10px] text-slate-400 font-medium">
+                ประมวลกฎหมายไทย
+              </span>
+            </div>
           </div>
-          <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          <nav className="flex-1 p-3 space-y-1.5 overflow-y-auto">
             <button
                 onClick={handleBackToBookshelf}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all font-sans ${view === ViewState.BOOKSHELF ? 'bg-law-50 dark:bg-law-900/30 text-law-700 dark:text-law-200 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl transition-all font-sans text-sm ${view === ViewState.BOOKSHELF ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold shadow-2xs border border-indigo-200/50 dark:border-indigo-800/50' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
             >
-                <Library size={20} />
+                <Library size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
                 <span>ห้องสมุดกฎหมาย</span>
             </button>
 
             <button 
                 onClick={() => { setView(ViewState.MEMORIZE); setActiveBookId(null); setSearchQuery(''); }} 
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all font-sans ${
+                className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl transition-all font-sans text-sm ${
                   view === ViewState.MEMORIZE 
-                    ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 font-bold shadow-sm' 
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 font-bold shadow-2xs border border-purple-200/50 dark:border-purple-800/50' 
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-purple-50/50 dark:hover:bg-purple-950/30'
                 }`}
             >
-                <Brain size={20} className="text-purple-600 dark:text-purple-400 shrink-0"/>
+                <Brain size={18} className="text-purple-600 dark:text-purple-400 shrink-0"/>
                 <div className="flex items-center justify-between w-full">
                   <span>ท่องสอบ (เตรียมสอบ)</span>
-                  <span className="text-[10px] bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded-full font-bold">ใหม่</span>
+                  <span className="text-[10px] bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded-full font-bold">Flashcards</span>
                 </div>
             </button>
             
             {activeBookId && (
                 <>
-                    <div className="pt-2 pb-1 px-4 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                        {activeBook?.abbreviation || 'เมนูหลัก'}
+                    <div className="pt-3 pb-1 px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        {activeBook?.abbreviation || 'เมนูเล่มนี้'}
                     </div>
                     {[
-                    { v: ViewState.HOME, l: 'เนื้อหา', i: Home },
+                    { v: ViewState.HOME, l: 'เนื้อหาทั้งหมด', i: Home },
                     { v: ViewState.TOC, l: 'สารบัญ', i: List },
-                    { v: ViewState.SEARCH, l: 'ค้นหา', i: Search },
-                    { v: ViewState.HIGHLIGHTS, l: 'รายการสำคัญ', i: Star },
+                    { v: ViewState.SEARCH, l: 'ค้นหาในเล่ม', i: Search },
+                    { v: ViewState.HIGHLIGHTS, l: 'มาตราสำคัญ', i: Star },
                     { v: ViewState.NOTES, l: 'บันทึกของฉัน', i: BookMarked },
                     { v: ViewState.ADD, l: 'แก้ไข/เพิ่มเติม', i: PlusSquare },
                     ].map((item) => (
@@ -309,9 +316,9 @@ const App: React.FC = () => {
                         onClick={() => {
                             setView(item.v);
                         }}
-                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all font-sans ${view === item.v ? 'bg-law-50 dark:bg-law-900/30 text-law-700 dark:text-law-200 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                        className={`w-full flex items-center space-x-3 px-3.5 py-2 rounded-xl transition-all font-sans text-sm ${view === item.v ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-semibold border border-indigo-200/50 dark:border-indigo-800/50' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
                     >
-                        <item.i size={20} />
+                        <item.i size={17} className={view === item.v ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'} />
                         <span>{item.l}</span>
                     </button>
                     ))}
@@ -320,22 +327,22 @@ const App: React.FC = () => {
                             setView(ViewState.MEMORIZE);
                             setSearchQuery('');
                         }}
-                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all font-sans text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/40 font-semibold`}
+                        className={`w-full flex items-center space-x-3 px-3.5 py-2 rounded-xl transition-all font-sans text-sm text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/40 font-semibold`}
                     >
-                        <Brain size={20} className="text-purple-600 dark:text-purple-400 shrink-0" />
+                        <Brain size={17} className="text-purple-600 dark:text-purple-400 shrink-0" />
                         <span>ท่องสอบ ({activeBook?.abbreviation})</span>
                     </button>
                 </>
             )}
             
-            <div className="pt-4 border-t border-gray-100 dark:border-gray-700 mt-2">
-                 <button
-                    onClick={() => setView(ViewState.SETTINGS)}
-                    className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all font-sans ${view === ViewState.SETTINGS ? 'bg-law-50 dark:bg-law-900/30 text-law-700 dark:text-law-200 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 mt-2">
+                 <a
+                    href="/settings"
+                    className="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl transition-all font-sans text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-indigo-600"
                 >
-                    <Settings size={20} />
-                    <span>ตั้งค่า</span>
-                </button>
+                    <Settings size={18} className="text-slate-400" />
+                    <span>การตั้งค่าระบบ</span>
+                </a>
             </div>
           </nav>
         </aside>
@@ -344,56 +351,57 @@ const App: React.FC = () => {
         <main className="flex-1 max-w-3xl mx-auto w-full md:p-6">
           
           {/* Mobile Header */}
-          <header className="md:hidden bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-20 p-4 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
+          <header className="md:hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur shadow-2xs sticky top-0 z-20 p-4 flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800">
              {view === ViewState.BOOKSHELF ? (
-                <div className="flex items-center space-x-2" onClick={() => setView(ViewState.BOOKSHELF)}>
-                    <Scale className="text-law-600" size={24} />
-                    <h1 className="text-lg font-bold text-gray-800 dark:text-gray-100 font-sans">Thai Law Mate</h1>
+                <div className="flex items-center space-x-2 cursor-pointer" onClick={() => setView(ViewState.BOOKSHELF)}>
+                    <Scale className="text-indigo-600 dark:text-indigo-400" size={22} />
+                    <h1 className="text-base font-bold text-slate-900 dark:text-white font-sans">Thai Law Mate</h1>
                 </div>
              ) : view === ViewState.MEMORIZE ? (
                 <div className="flex items-center space-x-2">
-                    <button onClick={handleBackToBookshelf} className="mr-1 text-gray-500">
-                        <ChevronLeft size={24} />
+                    <button onClick={handleBackToBookshelf} className="mr-1 text-slate-500">
+                        <ChevronLeft size={22} />
                     </button>
                     <div className="flex items-center space-x-2">
-                      <Brain className="text-purple-600" size={22} />
-                      <h1 className="text-sm font-bold text-gray-800 dark:text-gray-100 font-sans">ท่องสอบ (Active Recall)</h1>
+                      <Brain className="text-purple-600" size={20} />
+                      <h1 className="text-sm font-bold text-slate-900 dark:text-white font-sans">ท่องสอบ (Flashcards)</h1>
                     </div>
                 </div>
              ) : (
                  <div className="flex items-center space-x-2 overflow-hidden">
-                    <button onClick={handleBackToBookshelf} className="mr-1 text-gray-500">
-                        <ChevronLeft size={24} />
+                    <button onClick={handleBackToBookshelf} className="mr-1 text-slate-500">
+                        <ChevronLeft size={22} />
                     </button>
                     <div className="flex flex-col">
-                        <h1 className="text-sm font-bold text-gray-800 dark:text-gray-100 font-sans truncate max-w-[200px]">
+                        <h1 className="text-sm font-bold text-slate-900 dark:text-white font-sans truncate max-w-[200px]">
                             {activeBook?.name}
                         </h1>
-                        <span className="text-[10px] text-gray-500">{activeBook?.abbreviation}</span>
+                        <span className="text-[10px] text-slate-400">{activeBook?.abbreviation}</span>
                     </div>
                  </div>
              )}
             <div className="flex items-center space-x-2">
-                 <button 
-                    onClick={() => setView(ViewState.SETTINGS)}
-                    className={`p-2 rounded-full ${view === ViewState.SETTINGS ? 'bg-law-50 dark:bg-law-900/30 text-law-600' : 'text-gray-500 dark:text-gray-400'}`}
+                 <a 
+                    href="/settings"
+                    className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors"
+                    title="การตั้งค่าระบบ"
                  >
                     <Settings size={20} />
-                 </button>
+                 </a>
             </div>
           </header>
 
           {/* Dynamic Header / Title Bar */}
           {view !== ViewState.BOOKSHELF && view !== ViewState.MEMORIZE && activeBook && view !== ViewState.ADD && (
-             <div className="p-4 md:p-0 md:mb-6 sticky md:static top-[60px] z-10 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur md:bg-transparent font-sans">
+             <div className="p-4 md:p-0 md:mb-6 sticky md:static top-[60px] z-10 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur md:bg-transparent font-sans">
                 {view === ViewState.HOME && (
                 <div className="space-y-3">
                     <div className="flex flex-col">
                         <div className="flex justify-between items-start">
                              <div>
-                                <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 hidden md:block">{activeBook.name}</h2>
+                                <h2 className="text-2xl font-bold text-slate-900 dark:text-white hidden md:block">{activeBook.name}</h2>
                                 {activeBook.lastUpdated && (
-                                    <div className="flex items-center space-x-1 text-xs text-gray-400 mt-1">
+                                    <div className="flex items-center space-x-1 text-xs text-slate-400 mt-1">
                                         <Info size={12} />
                                         <span>ข้อมูล ณ วันที่ {activeBook.lastUpdated}</span>
                                     </div>
@@ -403,7 +411,7 @@ const App: React.FC = () => {
                               <div className="flex items-center gap-2">
                                 <button 
                                    onClick={() => setView(ViewState.MEMORIZE)}
-                                   className="flex items-center space-x-1.5 text-xs text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800/60 px-2.5 py-1.5 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/60 transition-colors font-semibold shadow-xs"
+                                   className="flex items-center space-x-1.5 text-xs text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800/60 px-2.5 py-1.5 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/60 transition-colors font-semibold shadow-2xs"
                                    title="เข้าสู่โหมดท่องจำเพื่อเตรียมสอบ"
                                 >
                                    <Brain size={14} className="text-purple-600 dark:text-purple-400" />
@@ -412,14 +420,14 @@ const App: React.FC = () => {
                                 <div className="hidden md:block"><FontSizeController /></div>
                                <button 
                                   onClick={openOfficialSource}
-                                  className="hidden md:flex items-center space-x-1 text-xs text-law-600 dark:text-law-400 bg-law-50 dark:bg-law-900/50 px-2 py-1 rounded hover:bg-law-100 dark:hover:bg-law-900/80 transition-colors"
+                                  className="hidden md:flex items-center space-x-1 text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-2.5 py-1.5 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/80 transition-colors border border-indigo-200/40"
                               >
                                   <span>ฉบับล่าสุดจากกฤษฎีกา</span>
-                                  <ExternalLink size={10} />
+                                  <ExternalLink size={11} />
                                </button>
                              </div>
                         </div>
-                        <p className="text-gray-500 dark:text-gray-400 text-sm mt-1 md:mt-0">เรียกดูมาตราทั้งหมด ({filteredLaws.length} มาตรา)</p>
+                        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1 md:mt-0">เรียกดูมาตราทั้งหมด ({filteredLaws.length} มาตรา)</p>
                     </div>
                     
                      {/* Mobile Only Official Link */}
@@ -427,7 +435,7 @@ const App: React.FC = () => {
                         <FontSizeController />
                         <button 
                                 onClick={openOfficialSource}
-                                className="flex w-full justify-center items-center space-x-2 text-xs text-law-600 dark:text-law-400 bg-law-50 dark:bg-law-900/50 px-3 py-2 rounded hover:bg-law-100 dark:hover:bg-law-900/80 transition-colors"
+                                className="flex w-full justify-center items-center space-x-2 text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-3 py-2 rounded-xl hover:bg-indigo-100 transition-colors border border-indigo-200/50"
                             >
                                 <span>ตรวจสอบฉบับล่าสุดจากกฤษฎีกา</span>
                                 <ExternalLink size={12} />
@@ -438,25 +446,25 @@ const App: React.FC = () => {
                 
                 {view === ViewState.NOTES && (
                 <div className="flex flex-col space-y-2">
-                    <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">บันทึกของฉัน</h2>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">{activeBook.abbreviation} - {filteredLaws.length} รายการ</p>
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">บันทึกของฉัน</h2>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm">{activeBook.abbreviation} - {filteredLaws.length} รายการ</p>
                 </div>
                 )}
                 
                 {view === ViewState.HIGHLIGHTS && (
                 <div className="flex flex-col space-y-2">
-                    <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 text-yellow-600 dark:text-yellow-500 flex items-center">
-                        <Star className="mr-2" fill="currentColor" />
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white text-yellow-600 dark:text-yellow-400 flex items-center">
+                        <Star className="mr-2 text-amber-500" fill="currentColor" />
                         รายการสำคัญ
                     </h2>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">{activeBook.abbreviation} - {filteredLaws.length} รายการ</p>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm">{activeBook.abbreviation} - {filteredLaws.length} รายการ</p>
                 </div>
                 )}
 
                 {view === ViewState.TOC && (
                 <div className="flex flex-col space-y-2">
-                    <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">สารบัญ</h2>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">เลือกหัวข้อเพื่อไปยังส่วนที่ต้องการ</p>
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">สารบัญ</h2>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm">เลือกหัวข้อเพื่อไปยังส่วนที่ต้องการ</p>
                 </div>
                 )}
 
@@ -467,10 +475,10 @@ const App: React.FC = () => {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder={`ค้นหาใน ${activeBook.abbreviation} (เช่น 288) หรือ เนื้อหา...`}
-                    className="w-full pl-11 pr-4 py-3 rounded-xl border-0 shadow-md text-gray-800 dark:text-white bg-white dark:bg-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-law-400 outline-none"
+                    placeholder={`ค้นหาใน ${activeBook.abbreviation} (เช่น 288) หรือ ข้อความ...`}
+                    className="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xs text-slate-800 dark:text-white bg-white dark:bg-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 outline-none"
                     />
-                    <Search className="absolute left-3 top-3.5 text-gray-400" size={20} />
+                    <Search className="absolute left-3.5 top-3.5 text-slate-400" size={20} />
                 </div>
                 )}
             </div>
@@ -478,8 +486,8 @@ const App: React.FC = () => {
           
           {view === ViewState.BOOKSHELF && (
              <div className="p-4 md:p-0 md:mb-8">
-                 <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 text-center md:text-left">ห้องสมุดกฎหมาย</h2>
-                 <p className="text-gray-500 text-center md:text-left mt-2">เลือกกฎหมายที่ต้องการศึกษา</p>
+                 <h2 className="text-2xl font-bold text-slate-900 dark:text-white text-center md:text-left">ห้องสมุดกฎหมาย</h2>
+                 <p className="text-slate-500 dark:text-slate-400 text-center md:text-left mt-1 text-sm">เลือกประมวลกฎหมายหรือ พ.ร.บ. ที่ต้องการศึกษาและค้นหา</p>
              </div>
           )}
 
@@ -527,13 +535,13 @@ const App: React.FC = () => {
                     />
                   ))
                 ) : (
-                  <div className="text-center py-20">
-                    <div className="bg-gray-100 dark:bg-gray-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                      {view === ViewState.SEARCH ? <Search className="text-gray-400" size={32}/> : 
-                       view === ViewState.HIGHLIGHTS ? <Star className="text-gray-400" size={32} /> :
-                       <BookMarked className="text-gray-400" size={32} />}
+                  <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-8">
+                    <div className="bg-slate-100 dark:bg-slate-800 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      {view === ViewState.SEARCH ? <Search className="text-slate-400" size={30}/> : 
+                       view === ViewState.HIGHLIGHTS ? <Star className="text-amber-400" size={30} /> :
+                       <BookMarked className="text-slate-400" size={30} />}
                     </div>
-                    <p className="text-gray-500 dark:text-gray-400 font-sans">
+                    <p className="text-slate-500 dark:text-slate-400 font-sans text-sm">
                       {view === ViewState.SEARCH 
                         ? (searchQuery ? "ไม่พบข้อมูลที่ค้นหา" : "พิมพ์เพื่อเริ่มค้นหา") 
                         : view === ViewState.NOTES 
@@ -545,7 +553,7 @@ const App: React.FC = () => {
                      {view === ViewState.SEARCH && searchQuery && (
                         <button 
                             onClick={openOfficialSource}
-                            className="mt-4 text-law-600 dark:text-law-400 hover:underline text-sm"
+                            className="mt-4 text-indigo-600 dark:text-indigo-400 hover:underline text-xs font-semibold"
                         >
                             ค้นหาต่อในฐานข้อมูลกฤษฎีกา
                         </button>
@@ -558,7 +566,7 @@ const App: React.FC = () => {
         </main>
 
         {/* Mobile Bottom Navigation */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex justify-around items-center px-2 pb-safe z-30 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 flex justify-around items-center px-2 pb-safe z-30 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
             {activeBookId ? (
                 <>
                     <NavItem targetView={ViewState.HOME} icon={Home} label="เนื้อหา" />
@@ -571,7 +579,13 @@ const App: React.FC = () => {
                  <>
                     <NavItem targetView={ViewState.BOOKSHELF} icon={Library} label="ห้องสมุด" />
                     <NavItem targetView={ViewState.MEMORIZE} icon={Brain} label="ท่องสอบ" />
-                    <NavItem targetView={ViewState.SETTINGS} icon={Settings} label="ตั้งค่า" />
+                    <a
+                      href="/settings"
+                      className="flex flex-col items-center justify-center w-full py-2 space-y-1 transition-colors text-slate-400 hover:text-indigo-600 cursor-pointer"
+                    >
+                      <Settings size={22} />
+                      <span className="text-[10px] font-medium">ตั้งค่า</span>
+                    </a>
                  </>
             )}
         </nav>

@@ -73,21 +73,21 @@ export const TOCView: React.FC<TOCViewProps> = ({ laws, onNavigate }) => {
     // Level 0: Root Cards (Part/Book)
     if (node.level === 0) {
         return (
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden mb-4 transition-all hover:shadow-md">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden mb-4 transition-all hover:shadow-xs">
                 <div 
                     onClick={handleToggle}
-                    className="bg-law-50/50 dark:bg-law-900/20 p-4 flex items-center justify-between cursor-pointer hover:bg-law-100/50 dark:hover:bg-law-900/30 transition-colors"
+                    className="bg-indigo-50/40 dark:bg-indigo-950/20 p-4 flex items-center justify-between cursor-pointer hover:bg-indigo-50/70 dark:hover:bg-indigo-900/30 transition-colors"
                 >
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className="bg-law-600 text-white p-1.5 rounded-md shadow-sm flex-shrink-0">
+                        <div className="bg-indigo-600 text-white p-1.5 rounded-lg shadow-2xs flex-shrink-0">
                             {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                         </div>
-                        <span className="font-bold text-law-900 dark:text-law-100 text-lg break-words leading-tight">{node.label}</span>
+                        <span className="font-bold text-slate-900 dark:text-white text-base break-words leading-tight">{node.label}</span>
                     </div>
                     {isClickable && (
                          <button 
                             onClick={handleNavigate}
-                            className="text-law-600 dark:text-law-400 hover:text-law-800 dark:hover:text-law-200 p-1 ml-2 flex-shrink-0"
+                            className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 p-1 ml-2 flex-shrink-0"
                             title="ไปที่ส่วนนี้"
                          >
                              <ArrowRightCircle size={20} />
@@ -95,7 +95,7 @@ export const TOCView: React.FC<TOCViewProps> = ({ laws, onNavigate }) => {
                     )}
                 </div>
                 {isExpanded && hasChildren && (
-                    <div className="border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
+                    <div className="border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
                         {node.children.map((child, idx) => (
                             <NodeItem key={`${child.label}-${idx}`} node={child} />
                         ))}
@@ -109,27 +109,27 @@ export const TOCView: React.FC<TOCViewProps> = ({ laws, onNavigate }) => {
     const paddingLeft = node.level === 1 ? 'pl-4' : node.level === 2 ? 'pl-8' : 'pl-12';
     
     return (
-      <div className="border-b border-gray-50 dark:border-gray-700 last:border-0">
+      <div className="border-b border-slate-100 dark:border-slate-800 last:border-0">
         <div 
           onClick={handleToggle}
           className={`
             flex items-center justify-between py-3 pr-4 cursor-pointer transition-colors
             ${paddingLeft}
-            ${node.level === 1 ? 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700' : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'}
+            ${node.level === 1 ? 'bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800' : 'bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'}
             ${isClickable ? '' : ''}
           `}
         >
           <div className="flex items-start gap-2 overflow-hidden">
             {hasChildren && (
-               <span className={`text-gray-400 transition-transform duration-200 mt-0.5 ${isExpanded ? 'rotate-90' : ''}`}>
+               <span className={`text-slate-400 transition-transform duration-200 mt-0.5 ${isExpanded ? 'rotate-90' : ''}`}>
                    <ChevronRight size={14} />
                </span>
             )}
             {!hasChildren && node.level > 1 && (
-                <CornerDownRight size={12} className="text-gray-300 dark:text-gray-600 flex-shrink-0 mt-1.5" />
+                <CornerDownRight size={12} className="text-slate-300 dark:text-slate-600 flex-shrink-0 mt-1.5" />
             )}
             
-            <span className={`break-words leading-snug ${node.level === 1 ? 'font-semibold text-gray-800 dark:text-gray-200' : 'text-sm text-gray-700 dark:text-gray-300'}`}>
+            <span className={`break-words leading-snug ${node.level === 1 ? 'font-semibold text-slate-800 dark:text-slate-200 text-sm' : 'text-xs text-slate-700 dark:text-slate-300'}`}>
               {node.label}
             </span>
           </div>
@@ -137,7 +137,7 @@ export const TOCView: React.FC<TOCViewProps> = ({ laws, onNavigate }) => {
           {isClickable && (
               <button 
                 onClick={handleNavigate}
-                className="text-gray-300 hover:text-law-600 dark:text-gray-600 dark:hover:text-law-400 transition-colors ml-2 flex-shrink-0"
+                className="text-slate-300 hover:text-indigo-600 dark:text-slate-600 dark:hover:text-indigo-400 transition-colors ml-2 flex-shrink-0"
               >
                   <ArrowRightCircle size={16} />
               </button>
@@ -158,18 +158,18 @@ export const TOCView: React.FC<TOCViewProps> = ({ laws, onNavigate }) => {
   return (
     <div className="max-w-3xl mx-auto pb-12">
       <div className="flex items-center justify-between px-2 mb-6">
-         <div className="flex items-center space-x-2 text-law-900 dark:text-law-100">
-            <ListTree size={24} />
-            <h2 className="text-2xl font-bold">สารบัญกฎหมาย</h2>
+         <div className="flex items-center space-x-2 text-slate-900 dark:text-white">
+            <ListTree size={22} className="text-indigo-600 dark:text-indigo-400" />
+            <h2 className="text-xl font-bold">สารบัญกฎหมาย</h2>
          </div>
-         <div className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full">
-            {laws.length} มาตรา
+         <div className="text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full border border-slate-200/60 dark:border-slate-700">
+            โครงสร้างมาตรา
          </div>
       </div>
       
-      <div className="space-y-1">
-        {tree.map((node, idx) => (
-          <NodeItem key={idx} node={node} />
+      <div className="space-y-4">
+        {tree.map((node, index) => (
+            <NodeItem key={`${node.label}-${index}`} node={node} />
         ))}
       </div>
     </div>

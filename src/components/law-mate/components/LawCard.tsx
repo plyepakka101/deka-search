@@ -592,14 +592,14 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
   return (
     <div 
       id={`section-${law.id}`} 
-      className={`relative bg-white dark:bg-gray-800 rounded-lg shadow-sm border overflow-visible mb-6 transition-all duration-300 hover:shadow-md group/card 
+      className={`relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xs border overflow-visible mb-5 transition-all duration-300 hover:shadow-xs group/card 
         ${isHighlighted 
-            ? 'border-yellow-400 ring-1 ring-yellow-100 dark:border-yellow-500/50 dark:ring-yellow-900/20' 
-            : 'border-gray-200 dark:border-gray-700'}`}
+            ? 'border-amber-400 ring-1 ring-amber-100 dark:border-amber-500/50 dark:ring-amber-900/20' 
+            : 'border-slate-200/80 dark:border-slate-800'}`}
     >
       {/* Highlight Indicator Strip */}
       {isHighlighted && (
-          <div className="absolute top-0 left-0 w-1 h-full bg-yellow-400 dark:bg-yellow-500 rounded-l-lg"></div>
+          <div className="absolute top-0 left-0 w-1.5 h-full bg-amber-400 dark:bg-amber-500 rounded-l-2xl"></div>
       )}
 
       {/* Highlight Menu Popover */}
