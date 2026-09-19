@@ -6,7 +6,8 @@ import { useParams } from 'next/navigation';
 import { 
   ArrowLeft, Clock, Play, Pause, RotateCcw, CheckCircle2, 
   AlertCircle, Scale, BookOpen, ChevronRight, X, ExternalLink, 
-  Sparkles, CheckSquare, Square, Eye, FileText, Check, Save
+  Sparkles, CheckSquare, Square, Eye, FileText, Check, Save,
+  Bot, Key, RefreshCw
 } from 'lucide-react';
 import { 
   saveExamAttempt, 
@@ -33,6 +34,14 @@ export default function ExamRoomPage() {
   const [pastAttempts, setPastAttempts] = useState<ExamAttempt[]>([]);
   const [currentReviewItem, setCurrentReviewItem] = useState<ExamReviewItem | null>(null);
   const [savedSuccessMessage, setSavedSuccessMessage] = useState<string | null>(null);
+
+  // AI Evaluation state
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiResult, setAiResult] = useState<any | null>(null);
+  const [geminiApiKey, setGeminiApiKey] = useState<string>('');
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState('');
 
   // Timer state (in seconds)
   const [timerSeconds, setTimerSeconds] = useState(0);
@@ -70,6 +79,13 @@ export default function ExamRoomPage() {
           const reviews = getReviewItems();
           const foundRev = reviews.find(r => r.questionId === id);
           if (foundRev) setCurrentReviewItem(foundRev);
+
+          // Load stored Gemini API key
+          const storedKey = localStorage.getItem('deka_gemini_api_key');
+          if (storedKey) {
+            setGeminiApiKey(storedKey);
+            setApiKeyInput(storedKey);
+          }
         }
       } catch (err: any) {
         console.error(err);
@@ -121,6 +137,55 @@ export default function ExamRoomPage() {
     }
   };
 
+  const handleSaveApiKey = () => {
+    const trimmed = apiKeyInput.trim();
+    setGeminiApiKey(trimmed);
+    if (typeof window !== 'undefined') {
+      if (trimmed) {
+        localStorage.setItem('deka_gemini_api_key', trimmed);
+      } else {
+        localStorage.removeItem('deka_gemini_api_key');
+      }
+    }
+    setIsApiKeyModalOpen(false);
+  };
+
+  const handleEvaluateWithAI = async () => {
+    if (!userDraft || userDraft.trim().length < 15) {
+      alert('กรุณาเขียนร่างคำตอบในกระดาษร่างอย่างน้อย 1-2 ประโยค เพื่อให้ AI ทำการตรวจวิเคราะห์ความถูกต้องและให้คะแนน');
+      return;
+    }
+
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const res = await fetch('/api/ai/evaluate-answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question,
+          userDraft,
+          apiKey: geminiApiKey || undefined
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        if (data.error && (data.error.includes('API Key') || data.error.includes('GEMINI_API_KEY'))) {
+          setIsApiKeyModalOpen(true);
+        }
+        throw new Error(data.error || 'เกิดข้อผิดพลาดในการประเมินด้วย AI');
+      }
+
+      setAiResult(data.evaluation);
+    } catch (err: any) {
+      console.error(err);
+      setAiError(err.message || 'ไม่สามารถประเมินผลด้วย AI ได้ในขณะนี้');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const handleSaveEvaluation = () => {
     if (!question) return;
     saveExamAttempt({
@@ -134,6 +199,7 @@ export default function ExamRoomPage() {
       totalIssuesCount,
       checkedCount,
       scorePercent,
+      relatedSections: question.relatedSections,
     });
 
     const updatedAttempts = getExamAttempts(id);
@@ -368,35 +434,193 @@ export default function ExamRoomPage() {
                 className="w-full p-4 text-sm md:text-base bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 leading-relaxed resize-y font-thai"
               />
 
-              {/* Reveal Answer Button */}
-              {!isAnswerRevealed ? (
-                <div className="flex items-center justify-between gap-3 pt-2">
-                  <span className="text-xs text-slate-400">
-                    เมื่อเขียนร่างเสร็จแล้ว กดปุ่มเพื่อเปิดดูธงคำตอบและประเมินประเด็น
-                  </span>
+              {/* Reveal Answer Button & AI Evaluator Button */}
+              <div className="flex items-center justify-between gap-3 pt-2 flex-wrap">
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={handleRevealAnswer}
-                    className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white rounded-xl text-sm font-semibold shadow-xs transition-all flex items-center gap-2 cursor-pointer active:scale-98 flex-shrink-0"
+                    onClick={handleEvaluateWithAI}
+                    disabled={aiLoading}
+                    className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs sm:text-sm font-semibold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-98"
+                    title="ให้ Gemini AI ช่วยตรวจประเมินข้อเขียน 3 มิติ (หลักกฎหมาย, ปรับบท, ฟันธง)"
                   >
-                    <Eye size={16} />
-                    <span>ดูธงคำตอบ & ตรวจประเด็น</span>
+                    {aiLoading ? (
+                      <>
+                        <RefreshCw size={14} className="animate-spin" />
+                        <span>AI กำลังวิเคราะห์ข้อสอบ...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Bot size={15} />
+                        <span>🤖 วิเคราะห์คำตอบด้วย AI</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => setIsApiKeyModalOpen(true)}
+                    className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl border border-slate-200 transition-colors"
+                    title="ตั้งค่า Gemini API Key"
+                  >
+                    <Key size={14} />
                   </button>
                 </div>
-              ) : (
-                <div className="flex items-center justify-between text-xs text-emerald-700 bg-emerald-50 px-3.5 py-2 rounded-xl border border-emerald-200">
-                  <span className="flex items-center gap-1.5 font-semibold">
-                    <CheckCircle2 size={16} />
-                    <span>เปิดดูธงคำตอบแล้ว (ตรวจประเด็นที่ด้านล่าง)</span>
-                  </span>
+
+                {!isAnswerRevealed ? (
+                  <button
+                    onClick={handleRevealAnswer}
+                    className="px-5 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white rounded-xl text-xs sm:text-sm font-semibold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-98 flex-shrink-0"
+                  >
+                    <Eye size={15} />
+                    <span>ดูธงคำตอบ & ตรวจประเด็น</span>
+                  </button>
+                ) : (
                   <button
                     onClick={() => setIsAnswerRevealed(false)}
                     className="text-xs font-semibold text-slate-500 hover:text-slate-700 underline"
                   >
-                    ซ่อนธง
+                    ซ่อนธงคำตอบ
+                  </button>
+                )}
+              </div>
+
+              {aiError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center justify-between gap-2">
+                  <span>{aiError}</span>
+                  <button
+                    onClick={() => setIsApiKeyModalOpen(true)}
+                    className="underline font-bold text-rose-800 flex-shrink-0"
+                  >
+                    ตั้งค่า API Key
                   </button>
                 </div>
               )}
             </div>
+
+            {/* AI Evaluation Result Card */}
+            {aiResult && (
+              <div className="bg-white rounded-3xl border-2 border-purple-200 shadow-md p-6 md:p-7 space-y-5 animate-in fade-in duration-300">
+                <div className="flex items-center justify-between border-b border-purple-100 pb-3 flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
+                      <Bot size={18} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">
+                        ผลการประเมินคำตอบโดย AI (Gemini Legal Evaluator)
+                      </h3>
+                      <p className="text-xs text-purple-600 font-medium">
+                        วิเคราะห์โครงสร้างตามเกณฑ์มาตรฐานเนติบัณฑิต
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-500">คะแนนประเมินรวม:</span>
+                    <span className={`text-lg font-extrabold px-3 py-0.5 rounded-xl border ${
+                      aiResult.overallScore >= 7
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                        : aiResult.overallScore >= 5
+                        ? 'bg-amber-50 text-amber-800 border-amber-300'
+                        : 'bg-rose-50 text-rose-800 border-rose-300'
+                    }`}>
+                      {aiResult.overallScore} / 10
+                    </span>
+                  </div>
+                </div>
+
+                {/* 3-Dimension Breakdown */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {/* Dimension 1: Rule */}
+                  <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-700">1. วางหลักกฎหมาย</span>
+                      <span className="text-xs font-extrabold px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-md">
+                        {aiResult.ruleScore ?? 0} / 10
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 leading-relaxed font-thai">
+                      {aiResult.ruleFeedback || 'ไม่มีความคิดเห็นเพิ่มเติม'}
+                    </p>
+                  </div>
+
+                  {/* Dimension 2: Application */}
+                  <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-700">2. การปรับบท</span>
+                      <span className="text-xs font-extrabold px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-md">
+                        {aiResult.applicationScore ?? 0} / 10
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 leading-relaxed font-thai">
+                      {aiResult.applicationFeedback || 'ไม่มีความคิดเห็นเพิ่มเติม'}
+                    </p>
+                  </div>
+
+                  {/* Dimension 3: Conclusion */}
+                  <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-700">3. สรุปฟันธง</span>
+                      <span className="text-xs font-extrabold px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-md">
+                        {aiResult.conclusionScore ?? 0} / 10
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 leading-relaxed font-thai">
+                      {aiResult.conclusionFeedback || 'ไม่มีความคิดเห็นเพิ่มเติม'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Strengths & Improvements */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                  {aiResult.strengths?.length > 0 && (
+                    <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-2">
+                      <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                        <CheckCircle2 size={14} className="text-emerald-600" />
+                        <span>จุดเด่นของคำตอบ (Strengths):</span>
+                      </span>
+                      <ul className="space-y-1 text-xs text-emerald-950 font-thai">
+                        {aiResult.strengths.map((s: string, idx: number) => (
+                          <li key={idx} className="flex items-start gap-1.5">
+                            <span className="text-emerald-500">•</span>
+                            <span>{s}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {aiResult.improvements?.length > 0 && (
+                    <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-2">
+                      <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                        <AlertCircle size={14} className="text-amber-600" />
+                        <span>จุดที่ควรปรับปรุง / ตกหล่น (Improvements):</span>
+                      </span>
+                      <ul className="space-y-1 text-xs text-amber-950 font-thai">
+                        {aiResult.improvements.map((im: string, idx: number) => (
+                          <li key={idx} className="flex items-start gap-1.5">
+                            <span className="text-amber-500">•</span>
+                            <span>{im}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* Recommended Phrasing */}
+                {aiResult.recommendedPhrasing && (
+                  <div className="p-4 bg-indigo-50/60 border border-indigo-200 rounded-2xl space-y-1.5">
+                    <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                      <Sparkles size={14} className="text-indigo-600" />
+                      <span>ข้อแนะนำสำนวนภาษาเขียนตอบ (Recommended Legal Phrasing):</span>
+                    </span>
+                    <p className="text-xs md:text-sm text-indigo-950 italic leading-relaxed font-thai whitespace-pre-line">
+                      &ldquo;{aiResult.recommendedPhrasing}&rdquo;
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* 2. Official Answer & Self-Evaluation (Shown when revealed) */}
             {isAnswerRevealed && (
@@ -687,6 +911,91 @@ export default function ExamRoomPage() {
                 className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-semibold hover:bg-slate-800 transition-colors"
               >
                 ปิดหน้าต่าง
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Gemini API Key Modal */}
+      {isApiKeyModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">
+                  <Key size={16} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">
+                    ตั้งค่า Google Gemini API Key
+                  </h3>
+                  <p className="text-[11px] text-slate-500">สำหรับใช้งาน AI Legal Evaluator</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsApiKeyModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-slate-600 leading-relaxed font-thai">
+              <p>
+                ระบบใช้ <strong>Google Gemini 2.5 Flash</strong> ในการช่วยตรวจวิเคราะห์โครงสร้างคำตอบ (วางหลัก, ปรับบท, สรุป)
+              </p>
+              <div className="p-3 bg-purple-50 rounded-xl border border-purple-100 space-y-1 text-purple-900">
+                <p className="font-semibold">💡 รับ API Key ฟรีได้จาก Google AI Studio:</p>
+                <a
+                  href="https://aistudio.google.com/app/apikey"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-purple-700 hover:text-purple-900 font-bold underline inline-flex items-center gap-1"
+                >
+                  <span>aistudio.google.com/app/apikey</span>
+                  <ExternalLink size={12} />
+                </a>
+                <p className="text-[11px] text-purple-700/80 mt-1">
+                  * กุญแจจะถูกบันทึกไว้ในเบราว์เซอร์ของท่านเท่านั้น (localStorage) ปลอดภัย 100%
+                </p>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Gemini API Key ของคุณ:
+                </label>
+                <input
+                  type="password"
+                  value={apiKeyInput}
+                  onChange={(e) => setApiKeyInput(e.target.value)}
+                  placeholder="AIzaSy..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-mono text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => {
+                  setApiKeyInput('');
+                  handleSaveApiKey();
+                }}
+                className="px-3 py-2 text-slate-500 hover:text-rose-600 text-xs font-semibold"
+              >
+                ล้างคีย์
+              </button>
+              <button
+                onClick={() => setIsApiKeyModalOpen(false)}
+                className="px-3.5 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-semibold"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={handleSaveApiKey}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors"
+              >
+                บันทึก API Key
               </button>
             </div>
           </div>

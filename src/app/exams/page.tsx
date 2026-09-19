@@ -5,19 +5,26 @@ import Link from 'next/link';
 import { 
   GraduationCap, Search, Filter, BookOpen, Scale, 
   Calendar, ChevronRight, CheckCircle2, Clock, Sparkles, AlertCircle,
-  Award, Trophy, History, RotateCcw, ArrowRight
+  Award, Trophy, History, RotateCcw, ArrowRight, BarChart3, Activity,
+  Flame, Target, Zap
 } from 'lucide-react';
 import { EXAM_CATEGORIES } from '@/utils/examParser';
 import { 
   getExamStatistics, 
   getDueReviewItems, 
   getExamAttempts, 
+  getCategoryPerformance,
+  getWeaknessAnalytics,
+  getPacingAnalytics,
+  getReadinessScore,
   ExamAttempt, 
-  ExamReviewItem 
+  ExamReviewItem,
+  CategoryPerformance,
+  WeakSectionItem
 } from '@/services/examService';
 
 export default function ExamsCatalogPage() {
-  const [activeMainTab, setActiveMainTab] = useState<'all' | 'due' | 'history'>('all');
+  const [activeMainTab, setActiveMainTab] = useState<'all' | 'due' | 'history' | 'analytics'>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedYear, setSelectedYear] = useState<string>('');
@@ -39,10 +46,26 @@ export default function ExamsCatalogPage() {
   const [dueItems, setDueItems] = useState<ExamReviewItem[]>([]);
   const [recentAttempts, setRecentAttempts] = useState<ExamAttempt[]>([]);
 
+  // Analytics State
+  const [categoryPerf, setCategoryPerf] = useState<CategoryPerformance[]>([]);
+  const [weakSections, setWeakSections] = useState<WeakSectionItem[]>([]);
+  const [pacingData, setPacingData] = useState({
+    avgSecondsPerQuestion: 0,
+    optimalCount: 0,
+    overtimeCount: 0,
+    fastCount: 0,
+    standardSeconds: 1440,
+  });
+  const [readinessScore, setReadinessScore] = useState<number>(0);
+
   const refreshClientData = () => {
     setStats(getExamStatistics());
     setDueItems(getDueReviewItems());
     setRecentAttempts(getExamAttempts());
+    setCategoryPerf(getCategoryPerformance());
+    setWeakSections(getWeaknessAnalytics());
+    setPacingData(getPacingAnalytics());
+    setReadinessScore(getReadinessScore(totalQuestions || 10));
   };
 
   const fetchExams = async () => {
@@ -117,15 +140,22 @@ export default function ExamsCatalogPage() {
             ฝึกเขียนตอบข้อสอบเนติบัณฑิตและผู้ช่วยฯ ตรวจสอบประเด็นสำคัญ (Issue Spotting) เทียบกับธงคำตอบ พร้อมอ่านคำพิพากษาศาลฎีกาที่เกี่ยวข้องได้ทันทีในหน้าเดียว
           </p>
 
-          <div className="flex items-center gap-4 pt-2 text-xs text-slate-300 font-medium">
-            <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-4 pt-3 flex-wrap">
+            <div className="flex items-center gap-1.5 text-xs text-slate-300 font-medium">
               <GraduationCap className="text-indigo-400" size={16} />
               <span>ข้อสอบทั้งหมด {totalQuestions} ข้อ</span>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 text-xs text-slate-300 font-medium">
               <Scale className="text-emerald-400" size={16} />
               <span>เชื่อมต่อฐานข้อมูล 69,417 ฎีกา</span>
             </div>
+            <Link
+              href="/exams/simulation"
+              className="ml-auto inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all"
+            >
+              <Flame size={15} />
+              <span>จำลองห้องสอบจริง (Mock Exam)</span>
+            </Link>
           </div>
         </div>
       </div>
@@ -197,10 +227,10 @@ export default function ExamsCatalogPage() {
       </div>
 
       {/* Main Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
         <button
           onClick={() => setActiveMainTab('all')}
-          className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
             activeMainTab === 'all'
               ? 'bg-indigo-600 text-white shadow-xs'
               : 'text-slate-600 hover:bg-slate-100'
@@ -217,7 +247,7 @@ export default function ExamsCatalogPage() {
 
         <button
           onClick={() => setActiveMainTab('due')}
-          className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
             activeMainTab === 'due'
               ? 'bg-amber-600 text-white shadow-xs'
               : 'text-slate-600 hover:bg-slate-100'
@@ -236,7 +266,7 @@ export default function ExamsCatalogPage() {
 
         <button
           onClick={() => setActiveMainTab('history')}
-          className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
             activeMainTab === 'history'
               ? 'bg-slate-800 text-white shadow-xs'
               : 'text-slate-600 hover:bg-slate-100'
@@ -249,6 +279,18 @@ export default function ExamsCatalogPage() {
           }`}>
             {stats.totalAttempts}
           </span>
+        </button>
+
+        <button
+          onClick={() => setActiveMainTab('analytics')}
+          className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
+            activeMainTab === 'analytics'
+              ? 'bg-purple-600 text-white shadow-xs'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <BarChart3 size={16} />
+          <span>วิเคราะห์จุดอ่อน & แดชบอร์ด</span>
         </button>
       </div>
 
@@ -623,6 +665,315 @@ export default function ExamsCatalogPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* TAB 4: ADVANCED ANALYTICS & WEAKNESS HEATMAP */}
+      {activeMainTab === 'analytics' && (
+        <div className="space-y-8 animate-in fade-in">
+          
+          {/* Readiness Gauge & Fast Mock CTA */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            {/* Readiness Card (lg:col-span-7) */}
+            <div className="lg:col-span-7 bg-white rounded-3xl border border-slate-200 p-6 md:p-8 shadow-xs space-y-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 text-xs font-bold border border-purple-200 mb-1">
+                    <Target size={13} />
+                    <span>ดัชนีความพร้อมสู่สนามสอบ (Readiness Index)</span>
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900">
+                    Exam Readiness Score
+                  </h3>
+                </div>
+
+                <div className="text-right">
+                  <div className="text-3xl md:text-4xl font-black text-purple-700">
+                    {readinessScore}%
+                  </div>
+                  <div className="text-xs font-semibold text-slate-500">
+                    {readinessScore >= 75 ? '🟢 ความพร้อมระดับสูง' : readinessScore >= 45 ? '🟡 กำลังพัฒนา' : '🔴 เริ่มต้นฝึกฝน'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs font-medium text-slate-500">
+                  <span>ความก้าวหน้าสู่เป้าหมายเนติบัณฑิต (เกณฑ์ผ่าน 80%)</span>
+                  <span>{readinessScore} / 100</span>
+                </div>
+                <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden p-0.5 border border-slate-200">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      readinessScore >= 75 ? 'bg-gradient-to-r from-emerald-500 to-teal-500' :
+                      readinessScore >= 45 ? 'bg-gradient-to-r from-amber-500 to-indigo-500' :
+                      'bg-gradient-to-r from-rose-500 to-purple-500'
+                    }`}
+                    style={{ width: `${Math.max(5, readinessScore)}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Weight Factors Breakdown */}
+              <div className="grid grid-cols-3 gap-3 pt-2 text-center text-xs">
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                  <div className="font-bold text-slate-800">{stats.uniqueQuestionsDone} / {totalQuestions} ข้อ</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">ครอบคลุมคลังข้อสอบ (40%)</div>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                  <div className="font-bold text-slate-800">{stats.avgScore}%</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">คะแนนเฉลี่ยรวม (40%)</div>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                  <div className="font-bold text-slate-800">{stats.masteredCount} ข้อ</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">ความแม่นยำ Mastered (20%)</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Mock Exam Simulator Launch Card (lg:col-span-5) */}
+            <div className="lg:col-span-5 bg-gradient-to-br from-indigo-900 via-purple-950 to-slate-900 text-white rounded-3xl p-6 md:p-8 shadow-md flex flex-col justify-between space-y-4">
+              <div className="space-y-3">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-indigo-300 text-xs font-bold border border-white/20">
+                  <Flame size={14} className="text-amber-400" />
+                  <span>ระบบจำลองห้องสอบเสมือนจริง</span>
+                </div>
+                <h3 className="text-xl font-bold text-white leading-tight">
+                  ทดสอบตนเองในสถานการณ์สอบจริง 24 นาที/ข้อ
+                </h3>
+                <p className="text-xs md:text-sm text-slate-300 leading-relaxed font-thai">
+                  ซ้อมทำข้อสอบแบบจับเวลาถอยหลัง Digital Answer Sheet บันทึกอัตโนมัติ และตรวจประเด็นด้วย AI ทันทีหลังส่งกระดาษคำตอบ
+                </p>
+              </div>
+
+              <Link
+                href="/exams/simulation"
+                className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-2xl font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+              >
+                <Flame size={16} />
+                <span>เข้าสู่ห้องสอบจำลอง (Mock Exam Simulator)</span>
+              </Link>
+            </div>
+
+          </div>
+
+          {/* 9-Category Knowledge Heatmap */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 md:p-8 shadow-xs space-y-5">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Activity size={18} className="text-indigo-600" />
+                  <span>Knowledge Heatmap: แผนผังความเชี่ยวชาญ 9 หมวดวิชา</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  วิเคราะห์ระดับความแม่นยำในแต่ละสายวิชา เพื่อค้นหาจุดอ่อนและจัดลำดับความสำคัญในการทบทวน
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 text-xs">
+                <span className="flex items-center gap-1 text-emerald-700 font-semibold">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                  <span>แม่นยำ (&gt;= 80%)</span>
+                </span>
+                <span className="flex items-center gap-1 text-amber-700 font-semibold">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                  <span>ปานกลาง (60-79%)</span>
+                </span>
+                <span className="flex items-center gap-1 text-rose-700 font-semibold">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                  <span>จุดอ่อน (&lt; 60%)</span>
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              {categoryPerf.map((cp, idx) => {
+                const isMastered = cp.status === 'mastered';
+                const isGood = cp.status === 'good';
+                const isWeak = cp.status === 'weak';
+                const isUnattempted = cp.status === 'unattempted';
+
+                return (
+                  <div
+                    key={idx}
+                    className={`p-4 rounded-2xl border transition-all ${
+                      isMastered
+                        ? 'bg-emerald-50/50 border-emerald-200 hover:border-emerald-300'
+                        : isGood
+                        ? 'bg-amber-50/50 border-amber-200 hover:border-amber-300'
+                        : isWeak
+                        ? 'bg-rose-50/50 border-rose-200 hover:border-rose-300'
+                        : 'bg-slate-50/70 border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="text-xs font-bold text-slate-900 line-clamp-1">
+                        {cp.category}
+                      </h4>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border shrink-0 ${
+                        isMastered
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                          : isGood
+                          ? 'bg-amber-100 text-amber-800 border-amber-200'
+                          : isWeak
+                          ? 'bg-rose-100 text-rose-800 border-rose-200'
+                          : 'bg-slate-200 text-slate-600 border-slate-300'
+                      }`}>
+                        {isMastered ? 'แม่นยำ' : isGood ? 'ปานกลาง' : isWeak ? 'จุดอ่อน' : 'ยังไม่เคยฝึก'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-end justify-between mt-3">
+                      <div>
+                        <div className="text-lg font-black text-slate-800">
+                          {isUnattempted ? '-' : `${cp.avgScore}%`}
+                        </div>
+                        <div className="text-[11px] text-slate-500">
+                          {isUnattempted ? 'ยังไม่มีประวัติ' : `ทำแล้ว ${cp.totalAttempts} ครั้ง (ผ่าน ${cp.passedCount})`}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setSelectedCategory(cp.category);
+                          setActiveMainTab('all');
+                        }}
+                        className="px-2.5 py-1 text-xs font-semibold bg-white hover:bg-slate-100 text-slate-700 rounded-lg border border-slate-200 shadow-2xs transition-colors"
+                      >
+                        ฝึกข้อสอบ
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Critical Weakness Law Sections & Pacing Analytics Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            {/* Critical Weakness Sections (lg:col-span-7) */}
+            <div className="lg:col-span-7 bg-white rounded-3xl border border-slate-200 p-6 md:p-8 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <BookOpen size={18} className="text-rose-600" />
+                    <span>มาตราจุดอ่อนเร่งด่วน (Critical Weakness Sections)</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    มาตราที่ตอบผิดหรือตกประเด็นบ่อยที่สุด พร้อมปุ่มลัดอ่านตัวบทและฝึกข้อสอบตรงมาตรา
+                  </p>
+                </div>
+              </div>
+
+              {weakSections.length === 0 ? (
+                <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-500 space-y-2">
+                  <CheckCircle2 size={24} className="text-emerald-500 mx-auto" />
+                  <p className="font-semibold text-slate-700">ยังไม่พบมาตราที่เป็นจุดอ่อนวิกฤต</p>
+                  <p>เมื่อคุณฝึกทำข้อสอบและบันทึกผล ระบบจะวิเคราะห์มาตราที่คุณตกหล่นมาแสดงที่นี่โดยอัตโนมัติ</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {weakSections.slice(0, 5).map((ws, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between gap-3 flex-wrap"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold">
+                            {ws.law} ม.{ws.section}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            ฝึกทำ {ws.attemptsCount} ครั้ง • ตกประเด็น {ws.failedCount} ครั้ง
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-600 font-medium">
+                          อัตราความแม่นยำ: <strong className={ws.accuracyPercent < 50 ? 'text-rose-600' : 'text-amber-600'}>{ws.accuracyPercent}%</strong>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/laws?q=${encodeURIComponent(ws.section)}`}
+                          target="_blank"
+                          className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold border border-slate-200 transition-colors flex items-center gap-1"
+                        >
+                          <BookOpen size={13} className="text-indigo-600" />
+                          <span>อ่านตัวบท</span>
+                        </Link>
+                        <button
+                          onClick={() => {
+                            setSearchQuery(`ม.${ws.section}`);
+                            setActiveMainTab('all');
+                          }}
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1"
+                        >
+                          <span>ฝึกข้อสอบ</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Pacing Analytics (lg:col-span-5) */}
+            <div className="lg:col-span-5 bg-white rounded-3xl border border-slate-200 p-6 md:p-8 shadow-xs space-y-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Clock size={18} className="text-indigo-600" />
+                  <span>Pacing Analytics (ความเร็วการเขียนตอบ)</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  เปรียบเทียบกับเกณฑ์เวลามาตรฐานเนติบัณฑิต 24 นาที/ข้อ (1,440 วินาที)
+                </p>
+              </div>
+
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700">เวลาเฉลี่ยต่อข้อ:</span>
+                  <span className="text-base font-black text-indigo-700 font-mono">
+                    {formatSeconds(pacingData.avgSecondsPerQuestion)}
+                  </span>
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-slate-200 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-emerald-700 font-medium">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span>ตามเกณฑ์มาตรฐาน (15-24 นาที):</span>
+                    </span>
+                    <strong className="text-slate-800">{pacingData.optimalCount} ข้อ</strong>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-rose-700 font-medium">
+                      <span className="w-2 h-2 rounded-full bg-rose-500" />
+                      <span>ใช้เวลาเกินเกณฑ์ (&gt; 24 นาที):</span>
+                    </span>
+                    <strong className="text-slate-800">{pacingData.overtimeCount} ข้อ</strong>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-amber-700 font-medium">
+                      <span className="w-2 h-2 rounded-full bg-amber-500" />
+                      <span>เขียนเร็วมาก (&lt; 15 นาที):</span>
+                    </span>
+                    <strong className="text-slate-800">{pacingData.fastCount} ข้อ</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 bg-indigo-50/60 rounded-2xl border border-indigo-100 text-[11px] text-indigo-900 leading-relaxed font-thai">
+                💡 <strong>คำแนะนำเชิงกลยุทธ์:</strong> ในการสอบเนติบัณฑิต 4 ชั่วโมง มี 10 ข้อ หากทำข้อไหนเกิน 24 นาทีจะดึงเวลาของข้ออื่น ควรฝึกจับประเด็นให้กระชับและบริหารเวลาให้พอดี
+              </div>
+            </div>
+
+          </div>
+
         </div>
       )}
     </main>
