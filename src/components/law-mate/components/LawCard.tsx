@@ -529,7 +529,7 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
               if (activeLink) {
                   element = (
                       <span 
-                        className="text-law-600 dark:text-law-400 font-semibold cursor-pointer hover:underline decoration-law-400"
+                        className="text-indigo-600 dark:text-indigo-400 font-semibold cursor-pointer hover:underline decoration-indigo-400"
                         onClick={(e) => {
                             e.stopPropagation();
                             if (onNavigateToSection) onNavigateToSection(activeLink.data);
@@ -569,7 +569,7 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
             <p key={pIndex} data-index={pIndex} className="indent-8 md:indent-10 mb-2 text-justify break-words whitespace-pre-wrap relative">
                 {pIndex === 0 && (
                     <span 
-                      className={`law-section-prefix font-bold inline mr-3 ${onNavigateToLawId || onNavigateToSection ? 'cursor-pointer hover:underline text-law-700 dark:text-law-300' : ''}`}
+                      className={`law-section-prefix font-bold inline mr-3 ${onNavigateToLawId || onNavigateToSection ? 'cursor-pointer hover:underline text-indigo-700 dark:text-indigo-300' : ''}`}
                       onClick={() => {
                         if (onNavigateToLawId) {
                           onNavigateToLawId(law.id, law.bookId as string);
@@ -692,14 +692,14 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
 
         {showDiff && originalContent ? (
             <div className="mb-4">
-                <div className="text-sm text-gray-500 mb-1">เปรียบเทียบกับต้นฉบับ:</div>
+                <div className="text-sm text-slate-500 mb-1">เปรียบเทียบกับต้นฉบับ:</div>
                 <DiffView original={originalContent} modified={law.content} />
             </div>
         ) : (
             <div 
                 ref={contentRef}
                 onMouseUp={handleTextSelection}
-                className={`text-gray-900 dark:text-gray-100 ${fontFamilyClass} selection:bg-law-200 dark:selection:bg-law-800`}
+                className={`text-slate-900 dark:text-slate-100 ${fontFamilyClass} selection:bg-indigo-100 dark:selection:bg-indigo-900`}
                 style={{ fontSize: 'var(--content-font-size, 16px)', lineHeight: settings.lineHeight || 1.8 }}
             >
                 {renderContentWithFeatures()}
@@ -707,80 +707,80 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
         )}
 
         {/* Action Bar */}
-        <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 font-sans">
+        <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 font-sans">
           <button 
             onClick={() => setIsEditingNote(!isEditingNote)}
-            className={`flex items-center space-x-1 text-sm px-3 py-1.5 rounded-md transition-all duration-200 hover:scale-105 active:scale-95 ${isEditingNote || hasNoteContent ? 'text-law-700 bg-law-50 dark:text-law-300 dark:bg-law-900/50' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+            className={`flex items-center space-x-1 text-xs sm:text-sm px-3 py-1.5 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${isEditingNote || hasNoteContent ? 'text-indigo-700 bg-indigo-50 border border-indigo-200/60 dark:text-indigo-300 dark:bg-indigo-950/60 dark:border-indigo-800/60 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
           >
-            <Edit size={16} />
+            <Edit size={15} />
             <span>{hasNoteContent ? 'แก้ไขโน้ต' : 'โน้ต'}</span>
           </button>
           
           {hasTextHighlights && (
             <button
               onClick={clearAllHighlights}
-              className="flex items-center space-x-1 text-sm px-3 py-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400 transition-all duration-200 hover:scale-105 active:scale-95"
+              className="flex items-center space-x-1 text-xs sm:text-sm px-3 py-1.5 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
               title="ลบไฮไลท์ทั้งหมด"
             >
-              <Highlighter size={16} />
+              <Highlighter size={15} />
               <span>ลบไฮไลท์</span>
             </button>
           )}
 
           <button
             onClick={handleSearchDika}
-             className="flex items-center space-x-1 text-sm px-3 py-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 hover:scale-105 active:scale-95"
+             className="flex items-center space-x-1 text-xs sm:text-sm px-3 py-1.5 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
              title="ค้นหาคำพิพากษาศาลฎีกา"
           >
-            <Search size={16} />
+            <Search size={15} />
             <span>ค้นหาฎีกา</span>
           </button>
 
           {linkedDecisions.length > 0 && (
             <button 
               onClick={() => setShowLinkedDecisions(!showLinkedDecisions)}
-              className={`flex items-center space-x-1 text-sm px-3 py-1.5 rounded-md transition-all duration-200 hover:scale-105 active:scale-95 ${showLinkedDecisions ? 'text-law-700 bg-law-50 dark:text-law-300 dark:bg-law-900/50' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+              className={`flex items-center space-x-1 text-xs sm:text-sm px-3 py-1.5 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${showLinkedDecisions ? 'text-indigo-700 bg-indigo-50 border border-indigo-200/60 dark:text-indigo-300 dark:bg-indigo-950/60 dark:border-indigo-800/60 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
               title="แสดง/ซ่อนฎีกาที่บันทึกไว้"
             >
-              <Scale size={16} />
+              <Scale size={15} />
               <span>ฎีกาที่บันทึกไว้ ({linkedDecisions.length})</span>
             </button>
           )}
 
           <button 
             onClick={handlePlayTTS}
-            className={`flex items-center space-x-1 text-sm px-3 py-1.5 rounded-md transition-all duration-200 hover:scale-105 active:scale-95 ${isPlaying ? 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/30' : 'text-gray-500 dark:text-gray-400 hover:text-law-600 dark:hover:text-law-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+            className={`flex items-center space-x-1 text-xs sm:text-sm px-3 py-1.5 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${isPlaying ? 'text-rose-600 bg-rose-50 dark:text-rose-400 dark:bg-rose-950/40' : 'text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
           >
-            {isPlaying ? <Square size={16} fill="currentColor" /> : <Volume2 size={16} />}
+            {isPlaying ? <Square size={15} fill="currentColor" /> : <Volume2 size={15} />}
             <span>{isPlaying ? 'หยุด' : 'ฟังเสียง'}</span>
           </button>
 
           <button 
             onClick={handleShare}
-            className="flex items-center space-x-1 text-sm px-3 py-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-law-600 dark:hover:text-law-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 hover:scale-105 active:scale-95"
+            className="flex items-center space-x-1 text-xs sm:text-sm px-3 py-1.5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
           >
-            <Share2 size={16} />
+            <Share2 size={15} />
             <span>แชร์</span>
           </button>
 
           {/* Memorization (ท่องสอบ) Button Group */}
-          <div className="inline-flex items-center rounded-lg border border-purple-200 dark:border-purple-800/60 overflow-hidden shadow-xs">
+          <div className="inline-flex items-center rounded-xl border border-purple-200 dark:border-purple-800/60 overflow-hidden shadow-2xs">
             <button 
               onClick={handleToggleMemorize}
-              className={`flex items-center space-x-1.5 text-sm px-3 py-1.5 transition-all duration-200 hover:scale-105 active:scale-95 ${
+              className={`flex items-center space-x-1.5 text-xs sm:text-sm px-3 py-1.5 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${
                 isInMemo 
                   ? 'text-purple-700 bg-purple-100 dark:text-purple-300 dark:bg-purple-950/80 font-bold' 
-                  : 'text-gray-600 dark:text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-gray-700'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-slate-800'
               }`}
               title={isInMemo ? "มาตรานี้อยู่ในชุดท่องสอบแล้ว (คลิกเพื่อนำออก)" : "เพิ่มมาตรานี้เข้าสู่ชุดท่องสอบ"}
             >
-              <Brain size={16} className={isInMemo ? "text-purple-600 dark:text-purple-400" : ""} />
+              <Brain size={15} className={isInMemo ? "text-purple-600 dark:text-purple-400" : ""} />
               <span>{isInMemo ? 'ท่องสอบ ⭐' : 'เพิ่มในท่องสอบ'}</span>
             </button>
 
             <button
               onClick={handleOpenQuickMemorize}
-              className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 dark:text-purple-300 text-xs font-semibold border-l border-purple-200 dark:border-purple-800/60 transition flex items-center gap-1"
+              className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 dark:text-purple-300 text-xs font-semibold border-l border-purple-200 dark:border-purple-800/60 transition flex items-center gap-1 cursor-pointer"
               title="เริ่มฝึกท่องจำมาตรานี้ทันที (เลือกได้ทั้ง 4 โหมด)"
             >
               <Play size={12} />
@@ -793,7 +793,7 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
               href={law.sourceUrl || officialUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center space-x-1 text-sm px-3 py-1.5 rounded-md text-gray-400 hover:text-law-600 hover:bg-gray-50 transition-all duration-200 hover:scale-105 active:scale-95 ml-auto"
+              className="flex items-center space-x-1 text-xs sm:text-sm px-3 py-1.5 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-slate-100 transition-all duration-200 hover:scale-105 active:scale-95 ml-auto cursor-pointer"
               title="ตรวจสอบกับต้นฉบับ"
             >
               <ExternalLink size={14} />
@@ -810,7 +810,7 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
                   value={noteText}
                   onChange={(e) => setNoteText(e.target.value)}
                   placeholder="บันทึกข้อความ..."
-                  className="w-full p-3 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:border-law-500 focus:ring-1 focus:ring-law-500 text-base min-h-[100px] resize-none outline-none font-sarabun"
+                  className="w-full p-3.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-base min-h-[100px] resize-none outline-none font-sarabun"
                 />
                 <div className="flex justify-end space-x-2 font-sans">
                   <button 
@@ -818,13 +818,13 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
                         setIsEditingNote(false);
                         setNoteText((note && note.text) ? note.text : '');
                     }}
-                    className="text-gray-600 dark:text-gray-400 text-sm px-3 py-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                    className="text-slate-600 dark:text-slate-400 text-xs sm:text-sm px-3.5 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
                   >
                     ยกเลิก
                   </button>
                   <button 
                     onClick={() => handleSaveNote()}
-                    className="bg-law-600 text-white text-sm px-4 py-1.5 rounded-md shadow-sm hover:bg-law-700 flex items-center space-x-1 transition-all hover:scale-105 active:scale-95"
+                    className="bg-indigo-600 text-white text-xs sm:text-sm px-4 py-1.5 rounded-xl shadow-2xs hover:bg-indigo-700 flex items-center space-x-1.5 transition-all hover:scale-105 active:scale-95 cursor-pointer font-semibold"
                   >
                     <Save size={14} />
                     <span>บันทึก</span>
@@ -834,13 +834,13 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
             ) : (
               <div 
                 onClick={() => setIsEditingNote(true)}
-                className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-md border border-yellow-200 dark:border-yellow-700/50 cursor-pointer hover:bg-yellow-100 dark:hover:bg-yellow-900/30 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 group relative shadow-sm"
+                className="bg-amber-50/60 dark:bg-amber-950/20 p-4 rounded-2xl border border-amber-200/80 dark:border-amber-800/40 cursor-pointer hover:bg-amber-100/60 dark:hover:bg-amber-900/30 transition-all duration-200 hover:shadow-xs group relative shadow-2xs"
               >
                  <div className="flex items-start space-x-3">
-                    <BookOpen className="text-yellow-700 dark:text-yellow-500 mt-1 flex-shrink-0" size={18} />
-                    <p className="text-yellow-900 dark:text-yellow-200 text-base font-sarabun leading-relaxed">{note ? note.text : ''}</p>
+                    <BookOpen className="text-amber-700 dark:text-amber-400 mt-1 flex-shrink-0" size={18} />
+                    <p className="text-amber-950 dark:text-amber-200 text-base font-sarabun leading-relaxed">{note ? note.text : ''}</p>
                  </div>
-                 <span className="absolute top-2 right-2 opacity-0 group-hover:opacity-60 text-xs text-yellow-800 bg-yellow-200 dark:bg-yellow-800 dark:text-yellow-100 px-1 rounded font-sans transition-opacity">แก้ไข</span>
+                 <span className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-xs text-amber-800 bg-amber-200/80 dark:bg-amber-800 dark:text-amber-100 px-2 py-0.5 rounded-md font-sans transition-opacity">แก้ไข</span>
               </div>
             )}
           </div>
@@ -848,15 +848,15 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
 
         {/* Linked Decisions Area */}
         {linkedDecisions.length > 0 && showLinkedDecisions && (
-          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-            <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3 flex items-center">
-              <span className="mr-2">📌</span> ฎีกาที่น่าสนใจในมาตรานี้
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-3 flex items-center">
+              <span className="mr-1.5">📌</span> ฎีกาที่น่าสนใจในมาตรานี้
             </h4>
             <div className="space-y-3 font-sans">
               {linkedDecisions.map(decision => (
-                <div key={decision.id} className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-law-300 transition-colors">
-                  <div className="flex justify-between items-start mb-2">
-                    <a href={`/decision/${decision.id}`} target="_blank" rel="noopener noreferrer" className="font-bold text-law-700 dark:text-law-400 hover:underline">
+                <div key={decision.id} className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-indigo-300 transition-colors">
+                  <div className="flex justify-between items-start mb-1.5">
+                    <a href={`/decision/${decision.id}`} target="_blank" rel="noopener noreferrer" className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline text-sm">
                       คำพิพากษาศาลฎีกาที่ {decision.decisionNumber}
                     </a>
                     <button 
@@ -864,19 +864,19 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
                         const newLinks = (note?.linkedDekaIds || []).filter(id => id !== decision.id);
                         handleSaveNote(undefined, undefined, undefined, newLinks);
                       }}
-                      className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                      className="text-slate-400 hover:text-rose-500 transition-colors p-1 cursor-pointer"
                       title="เอาออก"
                     >
                       <X size={14} />
                     </button>
                   </div>
                   {decision.decisionYear && (
-                    <div className="text-xs text-gray-500 mb-1">
+                    <div className="text-xs text-slate-500 mb-1">
                       ปี {decision.decisionYear} {decision.parties ? `· ${decision.parties}` : ''}
                     </div>
                   )}
                   {decision.shortSummary && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed mt-1">
+                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mt-1">
                       {decision.shortSummary}
                     </p>
                   )}
@@ -890,8 +890,8 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
 
       {/* Quick Memorize Modal Dialog */}
       {showQuickMemorizeModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="relative w-full max-w-2xl bg-white dark:bg-gray-800 rounded-3xl p-4 sm:p-6 shadow-2xl border border-gray-100 dark:border-gray-700 animate-in fade-in zoom-in-95 my-8">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-6 shadow-2xl border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 my-8">
             <MemorizePlayer
               items={[
                 existingMemoItem || {

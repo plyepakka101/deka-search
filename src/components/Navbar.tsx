@@ -140,6 +140,17 @@ export default function Navbar({ session }: { session: any }) {
                 <Bookmark className="w-4 h-4 text-slate-400" />
                 <span>บุ๊กมาร์ก</span>
               </Link>
+              <Link
+                href="/settings"
+                className={`px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                  isActive("/settings")
+                    ? "text-primary font-bold bg-primary/5"
+                    : "hover:text-primary hover:bg-slate-50"
+                }`}
+              >
+                <Settings className="w-4 h-4 text-slate-400" />
+                <span>ตั้งค่า</span>
+              </Link>
             </nav>
 
             {/* Laptop / iPad Landscape Compact Nav (Visible on lg to xl) */}
@@ -177,6 +188,17 @@ export default function Navbar({ session }: { session: any }) {
               >
                 <Bookmark className="w-4 h-4 text-slate-400" />
                 <span>บุ๊กมาร์ก</span>
+              </Link>
+              <Link
+                href="/settings"
+                className={`px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap flex items-center gap-1 ${
+                  isActive("/settings")
+                    ? "text-primary font-bold bg-primary/5"
+                    : "hover:text-primary hover:bg-slate-50"
+                }`}
+              >
+                <Settings className="w-4 h-4 text-slate-400" />
+                <span>ตั้งค่า</span>
               </Link>
             </nav>
           </div>

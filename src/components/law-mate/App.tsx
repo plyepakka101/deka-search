@@ -1,14 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { HashRouter } from 'react-router-dom';
 import { ViewState, LawSection, UserNote, AppSettings, LawBook } from './types';
 import { getLaws, getNotes, saveNote, saveCustomLaw, deleteCustomLaw, getSettings, saveSettings, getBooks, initLawsData } from './services/dataService';
 import { LawCard } from './components/LawCard';
 import { LawEditor } from './components/LawEditor';
 import { TOCView } from './components/TOCView';
-import { SettingsView } from './components/SettingsView';
 import { Bookshelf } from './components/Bookshelf';
 import { MemorizeHub } from './components/MemorizeHub';
-import { Home, Search, BookMarked, PlusSquare, Scale, ExternalLink, List, Star, Settings, Library, ChevronLeft, Info, Loader2, Brain } from 'lucide-react';
+import { Home, Search, BookMarked, PlusSquare, Scale, ExternalLink, List, Star, Library, ChevronLeft, Info, Loader2, Brain } from 'lucide-react';
 import { normalizeSearchQuery, thaiToArabic } from './utils/textUtils';
 
 import FontSizeController from '@/components/FontSizeController';
@@ -75,15 +73,6 @@ const App: React.FC = () => {
       window.addEventListener('hashchange', handleHashChange);
       return () => window.removeEventListener('hashchange', handleHashChange);
   }, [laws]); 
-
-  // Apply Dark Mode effect
-  useEffect(() => {
-      if (settings.darkMode) {
-          document.documentElement.classList.add('dark');
-      } else {
-          document.documentElement.classList.remove('dark');
-      }
-  }, [settings.darkMode]);
 
   const handleSaveNote = (note: UserNote) => {
     const updatedNotes = saveNote(note);
@@ -162,10 +151,10 @@ const App: React.FC = () => {
                   behavior: "smooth"
               });
 
-              element.classList.add('ring-2', 'ring-law-500', 'shadow-lg', 'scale-[1.02]', 'z-10', 'bg-law-50', 'dark:bg-law-900/40');
+              element.classList.add('ring-2', 'ring-indigo-500', 'shadow-md', 'scale-[1.01]', 'z-10', 'bg-indigo-50/50', 'dark:bg-indigo-950/40');
               
               setTimeout(() => {
-                   element.classList.remove('ring-2', 'ring-law-500', 'shadow-lg', 'scale-[1.02]', 'z-10', 'bg-law-50', 'dark:bg-law-900/40');
+                   element.classList.remove('ring-2', 'ring-indigo-500', 'shadow-md', 'scale-[1.01]', 'z-10', 'bg-indigo-50/50', 'dark:bg-indigo-950/40');
               }, 1500);
           }
       }, 200);
@@ -256,140 +245,120 @@ const App: React.FC = () => {
   }
 
   return (
-    <HashRouter>
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 pb-24 md:pb-0 flex flex-col md:flex-row transition-colors duration-200">
-        
-        {/* Sidebar for Desktop */}
-        <aside className="hidden md:flex flex-col w-64 bg-white dark:bg-slate-900 border-r border-slate-200/80 dark:border-slate-800 h-[calc(100vh-4rem)] sticky top-16 z-20">
-          <div className="p-5 flex items-center space-x-3 border-b border-slate-100 dark:border-slate-800">
-            <div className="bg-indigo-600 text-white p-2 rounded-xl shadow-2xs">
-              <Scale size={20} />
-            </div>
-            <div>
-              <h1 className="text-base font-bold text-slate-900 dark:text-white font-sans leading-tight">
-                Thai Law Mate
-              </h1>
-              <span className="text-[10px] text-slate-400 font-medium">
-                ประมวลกฎหมายไทย
-              </span>
-            </div>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 pb-24 md:pb-0 flex flex-col md:flex-row transition-colors duration-200">
+      
+      {/* Sidebar for Desktop */}
+      <aside className="hidden md:flex flex-col w-64 bg-white dark:bg-slate-900 border-r border-slate-200/80 dark:border-slate-800 h-[calc(100vh-4rem)] sticky top-16 z-20">
+        <div className="p-5 flex items-center space-x-3 border-b border-slate-100 dark:border-slate-800">
+          <div className="bg-indigo-600 text-white p-2 rounded-xl shadow-2xs">
+            <Scale size={20} />
           </div>
-          <nav className="flex-1 p-3 space-y-1.5 overflow-y-auto">
-            <button
-                onClick={handleBackToBookshelf}
-                className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl transition-all font-sans text-sm ${view === ViewState.BOOKSHELF ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold shadow-2xs border border-indigo-200/50 dark:border-indigo-800/50' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-            >
-                <Library size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
-                <span>ห้องสมุดกฎหมาย</span>
-            </button>
+          <div>
+            <h1 className="text-base font-bold text-slate-900 dark:text-white font-sans leading-tight">
+              Thai Law Mate
+            </h1>
+            <span className="text-[10px] text-slate-400 font-medium">
+              ประมวลกฎหมายไทย
+            </span>
+          </div>
+        </div>
+        <nav className="flex-1 p-3 space-y-1.5 overflow-y-auto">
+          <button
+              onClick={handleBackToBookshelf}
+              className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl transition-all font-sans text-sm ${view === ViewState.BOOKSHELF ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold shadow-2xs border border-indigo-200/50 dark:border-indigo-800/50' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+          >
+              <Library size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+              <span>ห้องสมุดกฎหมาย</span>
+          </button>
 
-            <button 
-                onClick={() => { setView(ViewState.MEMORIZE); setActiveBookId(null); setSearchQuery(''); }} 
-                className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl transition-all font-sans text-sm ${
-                  view === ViewState.MEMORIZE 
-                    ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 font-bold shadow-2xs border border-purple-200/50 dark:border-purple-800/50' 
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-purple-50/50 dark:hover:bg-purple-950/30'
-                }`}
-            >
-                <Brain size={18} className="text-purple-600 dark:text-purple-400 shrink-0"/>
-                <div className="flex items-center justify-between w-full">
-                  <span>ท่องสอบ (เตรียมสอบ)</span>
-                  <span className="text-[10px] bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded-full font-bold">Flashcards</span>
-                </div>
-            </button>
-            
-            {activeBookId && (
-                <>
-                    <div className="pt-3 pb-1 px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                        {activeBook?.abbreviation || 'เมนูเล่มนี้'}
-                    </div>
-                    {[
-                    { v: ViewState.HOME, l: 'เนื้อหาทั้งหมด', i: Home },
-                    { v: ViewState.TOC, l: 'สารบัญ', i: List },
-                    { v: ViewState.SEARCH, l: 'ค้นหาในเล่ม', i: Search },
-                    { v: ViewState.HIGHLIGHTS, l: 'มาตราสำคัญ', i: Star },
-                    { v: ViewState.NOTES, l: 'บันทึกของฉัน', i: BookMarked },
-                    { v: ViewState.ADD, l: 'แก้ไข/เพิ่มเติม', i: PlusSquare },
-                    ].map((item) => (
-                    <button
-                        key={item.v}
-                        onClick={() => {
-                            setView(item.v);
-                        }}
-                        className={`w-full flex items-center space-x-3 px-3.5 py-2 rounded-xl transition-all font-sans text-sm ${view === item.v ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-semibold border border-indigo-200/50 dark:border-indigo-800/50' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-                    >
-                        <item.i size={17} className={view === item.v ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'} />
-                        <span>{item.l}</span>
-                    </button>
-                    ))}
-                    <button
-                        onClick={() => {
-                            setView(ViewState.MEMORIZE);
-                            setSearchQuery('');
-                        }}
-                        className={`w-full flex items-center space-x-3 px-3.5 py-2 rounded-xl transition-all font-sans text-sm text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/40 font-semibold`}
-                    >
-                        <Brain size={17} className="text-purple-600 dark:text-purple-400 shrink-0" />
-                        <span>ท่องสอบ ({activeBook?.abbreviation})</span>
-                    </button>
-                </>
-            )}
-            
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 mt-2">
-                 <a
-                    href="/settings"
-                    className="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl transition-all font-sans text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-indigo-600"
-                >
-                    <Settings size={18} className="text-slate-400" />
-                    <span>การตั้งค่าระบบ</span>
-                </a>
-            </div>
-          </nav>
-        </aside>
-
-        {/* Main Content Area */}
-        <main className="flex-1 max-w-3xl mx-auto w-full md:p-6">
+          <button 
+              onClick={() => { setView(ViewState.MEMORIZE); setActiveBookId(null); setSearchQuery(''); }} 
+              className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl transition-all font-sans text-sm ${
+                view === ViewState.MEMORIZE 
+                  ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 font-bold shadow-2xs border border-purple-200/50 dark:border-purple-800/50' 
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-purple-50/50 dark:hover:bg-purple-950/30'
+              }`}
+          >
+              <Brain size={18} className="text-purple-600 dark:text-purple-400 shrink-0"/>
+              <div className="flex items-center justify-between w-full">
+                <span>ท่องสอบ (เตรียมสอบ)</span>
+                <span className="text-[10px] bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded-full font-bold">Flashcards</span>
+              </div>
+          </button>
           
-          {/* Mobile Header */}
-          <header className="md:hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur shadow-2xs sticky top-0 z-20 p-4 flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800">
-             {view === ViewState.BOOKSHELF ? (
-                <div className="flex items-center space-x-2 cursor-pointer" onClick={() => setView(ViewState.BOOKSHELF)}>
-                    <Scale className="text-indigo-600 dark:text-indigo-400" size={22} />
-                    <h1 className="text-base font-bold text-slate-900 dark:text-white font-sans">Thai Law Mate</h1>
-                </div>
-             ) : view === ViewState.MEMORIZE ? (
-                <div className="flex items-center space-x-2">
-                    <button onClick={handleBackToBookshelf} className="mr-1 text-slate-500">
-                        <ChevronLeft size={22} />
-                    </button>
-                    <div className="flex items-center space-x-2">
-                      <Brain className="text-purple-600" size={20} />
-                      <h1 className="text-sm font-bold text-slate-900 dark:text-white font-sans">ท่องสอบ (Flashcards)</h1>
-                    </div>
-                </div>
-             ) : (
-                 <div className="flex items-center space-x-2 overflow-hidden">
-                    <button onClick={handleBackToBookshelf} className="mr-1 text-slate-500">
-                        <ChevronLeft size={22} />
-                    </button>
-                    <div className="flex flex-col">
-                        <h1 className="text-sm font-bold text-slate-900 dark:text-white font-sans truncate max-w-[200px]">
-                            {activeBook?.name}
-                        </h1>
-                        <span className="text-[10px] text-slate-400">{activeBook?.abbreviation}</span>
-                    </div>
-                 </div>
-             )}
-            <div className="flex items-center space-x-2">
-                 <a 
-                    href="/settings"
-                    className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors"
-                    title="การตั้งค่าระบบ"
-                 >
-                    <Settings size={20} />
-                 </a>
-            </div>
-          </header>
+          {activeBookId && (
+              <>
+                  <div className="pt-3 pb-1 px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                      {activeBook?.abbreviation || 'เมนูเล่มนี้'}
+                  </div>
+                  {[
+                  { v: ViewState.HOME, l: 'เนื้อหาทั้งหมด', i: Home },
+                  { v: ViewState.TOC, l: 'สารบัญ', i: List },
+                  { v: ViewState.SEARCH, l: 'ค้นหาในเล่ม', i: Search },
+                  { v: ViewState.HIGHLIGHTS, l: 'มาตราสำคัญ', i: Star },
+                  { v: ViewState.NOTES, l: 'บันทึกของฉัน', i: BookMarked },
+                  { v: ViewState.ADD, l: 'แก้ไข/เพิ่มเติม', i: PlusSquare },
+                  ].map((item) => (
+                  <button
+                      key={item.v}
+                      onClick={() => {
+                          setView(item.v);
+                      }}
+                      className={`w-full flex items-center space-x-3 px-3.5 py-2 rounded-xl transition-all font-sans text-sm ${view === item.v ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-semibold border border-indigo-200/50 dark:border-indigo-800/50' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                  >
+                      <item.i size={17} className={view === item.v ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'} />
+                      <span>{item.l}</span>
+                  </button>
+                  ))}
+                  <button
+                      onClick={() => {
+                          setView(ViewState.MEMORIZE);
+                          setSearchQuery('');
+                      }}
+                      className={`w-full flex items-center space-x-3 px-3.5 py-2 rounded-xl transition-all font-sans text-sm text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/40 font-semibold`}
+                  >
+                      <Brain size={17} className="text-purple-600 dark:text-purple-400 shrink-0" />
+                      <span>ท่องสอบ ({activeBook?.abbreviation})</span>
+                  </button>
+              </>
+          )}
+        </nav>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="flex-1 max-w-3xl mx-auto w-full md:p-6">
+        
+        {/* Mobile Header */}
+        <header className="md:hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur shadow-2xs sticky top-0 z-20 p-4 flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800">
+           {view === ViewState.BOOKSHELF ? (
+              <div className="flex items-center space-x-2 cursor-pointer" onClick={() => setView(ViewState.BOOKSHELF)}>
+                  <Scale className="text-indigo-600 dark:text-indigo-400" size={22} />
+                  <h1 className="text-base font-bold text-slate-900 dark:text-white font-sans">Thai Law Mate</h1>
+              </div>
+           ) : view === ViewState.MEMORIZE ? (
+              <div className="flex items-center space-x-2">
+                  <button onClick={handleBackToBookshelf} className="mr-1 text-slate-500">
+                      <ChevronLeft size={22} />
+                  </button>
+                  <div className="flex items-center space-x-2">
+                    <Brain className="text-purple-600" size={20} />
+                    <h1 className="text-sm font-bold text-slate-900 dark:text-white font-sans">ท่องสอบ (Flashcards)</h1>
+                  </div>
+              </div>
+           ) : (
+               <div className="flex items-center space-x-2 overflow-hidden">
+                  <button onClick={handleBackToBookshelf} className="mr-1 text-slate-500">
+                      <ChevronLeft size={22} />
+                  </button>
+                  <div className="flex flex-col">
+                      <h1 className="text-sm font-bold text-slate-900 dark:text-white font-sans truncate max-w-[200px]">
+                          {activeBook?.name}
+                      </h1>
+                      <span className="text-[10px] text-slate-400">{activeBook?.abbreviation}</span>
+                  </div>
+               </div>
+           )}
+        </header>
 
           {/* Dynamic Header / Title Bar */}
           {view !== ViewState.BOOKSHELF && view !== ViewState.MEMORIZE && activeBook && view !== ViewState.ADD && (
@@ -512,10 +481,6 @@ const App: React.FC = () => {
             {view === ViewState.TOC && (
                <TOCView laws={filteredLaws} onNavigate={scrollToSection} />
             )}
-
-            {view === ViewState.SETTINGS && (
-               <SettingsView settings={settings} onUpdateSettings={handleUpdateSettings} />
-            )}
             
             {(view === ViewState.HOME || view === ViewState.SEARCH || view === ViewState.NOTES || view === ViewState.HIGHLIGHTS) && (
               <>
@@ -575,22 +540,14 @@ const App: React.FC = () => {
                     <NavItem targetView={ViewState.SEARCH} icon={Search} label="ค้นหา" />
                 </>
             ) : (
-                 // Simple nav for bookshelf / memorize view
-                 <>
+                  // Simple nav for bookshelf / memorize view
+                  <>
                     <NavItem targetView={ViewState.BOOKSHELF} icon={Library} label="ห้องสมุด" />
                     <NavItem targetView={ViewState.MEMORIZE} icon={Brain} label="ท่องสอบ" />
-                    <a
-                      href="/settings"
-                      className="flex flex-col items-center justify-center w-full py-2 space-y-1 transition-colors text-slate-400 hover:text-indigo-600 cursor-pointer"
-                    >
-                      <Settings size={22} />
-                      <span className="text-[10px] font-medium">ตั้งค่า</span>
-                    </a>
-                 </>
-            )}
+                  </>
+             )}
         </nav>
       </div>
-    </HashRouter>
   );
 };
 

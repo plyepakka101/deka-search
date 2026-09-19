@@ -9,6 +9,18 @@
   --color-primary: #0f172a;
   --color-primary-foreground: #ffffff;
   --color-accent: #c29b57; /* Gold/Brass accent for a premium legal look */
+
+  --color-law-50: var(--color-indigo-50);
+  --color-law-100: var(--color-indigo-100);
+  --color-law-200: var(--color-indigo-200);
+  --color-law-300: var(--color-indigo-300);
+  --color-law-400: var(--color-indigo-400);
+  --color-law-500: var(--color-indigo-500);
+  --color-law-600: var(--color-indigo-600);
+  --color-law-700: var(--color-indigo-700);
+  --color-law-800: var(--color-indigo-800);
+  --color-law-900: var(--color-indigo-900);
+  --color-law-950: var(--color-indigo-950);
 }
 
 @layer base {
