@@ -7,11 +7,13 @@ import { MemorizationDeck, MemorizationItem, MemorizationStats, LawSection, AppS
 import { 
   fetchDecks, fetchItems, fetchDueItems, getLocalDecks, 
   getLocalItems, getLocalDueItems, getMemorizeStats, 
-  saveDeck, deleteDeck, removeItem, addSectionToDeck, onMemorizeDataChanged 
+  saveDeck, deleteDeck, removeItem, addSectionToDeck, onMemorizeDataChanged,
+  sortMemoItems
 } from '../services/memorizeService';
 import { getLaws, getBooks } from '../services/dataService';
 import { formatNextReview } from '../services/srsEngine';
 import { thaiToArabic } from '../utils/textUtils';
+import { sortSectionsAscending } from '@/utils/sectionSort';
 import { MemorizePlayer } from './MemorizePlayer';
 
 interface MemorizeHubProps {
@@ -98,22 +100,24 @@ export const MemorizeHub: React.FC<MemorizeHubProps> = ({ settings }) => {
   const books = getBooks();
 
   const getItemsForBook = (bookId: string) => {
-    return items.filter(i => {
+    return sortMemoItems(items.filter(i => {
       if (i.bookId === bookId) return true;
       if (i.deckId === `deck-${bookId}`) return true;
       if (i.sectionId.startsWith(`${bookId}-`)) return true;
       const l = allLaws.find(law => law.id === i.sectionId);
       return l?.bookId === bookId;
-    });
+    }));
   };
 
   const activeBook = books.find(b => b.id === activeBookTab);
 
-  const currentTabItems = activeBookTab === 'all'
-    ? items
-    : (activeBookTab === 'custom'
-        ? items.filter(i => !books.some(b => i.deckId === `deck-${b.id}` || i.sectionId.startsWith(`${b.id}-`)))
-        : getItemsForBook(activeBookTab));
+  const currentTabItems = sortMemoItems(
+    activeBookTab === 'all'
+      ? items
+      : (activeBookTab === 'custom'
+          ? items.filter(i => !books.some(b => i.deckId === `deck-${b.id}` || i.sectionId.startsWith(`${b.id}-`)))
+          : getItemsForBook(activeBookTab))
+  );
 
   const currentTabDueItems = currentTabItems.filter(
     i => !i.nextReviewAt || new Date(i.nextReviewAt).getTime() <= Date.now()
@@ -167,16 +171,19 @@ export const MemorizeHub: React.FC<MemorizeHubProps> = ({ settings }) => {
     return true;
   });
 
-  // Filter laws in Add Item modal
-  const searchedLaws = allLaws.filter(l => {
-    if (addModalTargetBookId && l.bookId !== addModalTargetBookId) return false;
-    if (!addModalSearch.trim()) return true;
-    const q = addModalSearch.trim().toLowerCase();
-    const cleanSection = thaiToArabic(l.sectionNumber).toLowerCase();
-    const matchSec = cleanSection.includes(q) || l.sectionNumber.includes(q);
-    const matchContent = l.content.toLowerCase().includes(q);
-    return matchSec || matchContent;
-  }).slice(0, 30);
+  // Filter laws in Add Item modal, sorted ascending by section number
+  const searchedLaws = sortSectionsAscending(
+    allLaws.filter(l => {
+      if (addModalTargetBookId && l.bookId !== addModalTargetBookId) return false;
+      if (!addModalSearch.trim()) return true;
+      const q = addModalSearch.trim().toLowerCase();
+      const cleanSection = thaiToArabic(l.sectionNumber).toLowerCase();
+      const matchSec = cleanSection.includes(q) || l.sectionNumber.includes(q);
+      const matchContent = l.content.toLowerCase().includes(q);
+      return matchSec || matchContent;
+    }),
+    l => l.sectionNumber
+  ).slice(0, 30);
 
   return (
     <div className="space-y-6 pb-16 animate-in fade-in duration-200 max-w-5xl mx-auto font-sans">
@@ -249,7 +256,7 @@ export const MemorizeHub: React.FC<MemorizeHubProps> = ({ settings }) => {
             </div>
           </div>
           <button
-            onClick={() => setActiveSession({ items: dueItems, deckTitle: 'ทบทวนมาตราประจำวัน' })}
+            onClick={() => setActiveSession({ items: sortMemoItems(dueItems), deckTitle: 'ทบทวนมาตราประจำวัน' })}
             className="w-full sm:w-auto py-3 px-6 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm shadow-md transition flex items-center justify-center gap-2 shrink-0"
           >
             <Play size={18} />
@@ -672,7 +679,7 @@ export const MemorizeHub: React.FC<MemorizeHubProps> = ({ settings }) => {
 
                     <button
                       disabled={deckItems.length === 0}
-                      onClick={() => setActiveSession({ items: deckItems, deckTitle: deck.name })}
+                      onClick={() => setActiveSession({ items: sortMemoItems(deckItems), deckTitle: deck.name })}
                       className="py-1.5 px-4 rounded-xl bg-law-50 hover:bg-law-600 text-law-600 hover:text-white dark:bg-law-950/50 dark:text-law-300 dark:hover:bg-law-600 dark:hover:text-white text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-40"
                     >
                       <Play size={14} />

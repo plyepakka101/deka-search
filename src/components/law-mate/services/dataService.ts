@@ -1,6 +1,7 @@
 import { LawSection, UserNote, BackupData, AppSettings, LawBook, ExportOptions, MemorizationDeck, MemorizationItem, MemorizationStats } from '../types';
 import { parseLaws } from './lawParser';
 import { thaiToArabic } from '../utils/textUtils';
+import { sortSectionsAscending } from '@/utils/sectionSort';
 
 let cachedBooks: LawBook[] = [];
 let cachedLaws: LawSection[] = [];
@@ -165,7 +166,7 @@ export const getNotes = (): Record<string, UserNote> => {
   return stored ? JSON.parse(stored) : {};
 };
 
-export const saveNote = (note: UserNote) => {
+export const saveNote = (note: UserNote, lawInfo?: { sectionNumber?: string; bookId?: string; title?: string }) => {
   if (typeof window === 'undefined') return {};
   const notes = getNotes();
   
@@ -179,7 +180,63 @@ export const saveNote = (note: UserNote) => {
     notes[note.sectionId] = note;
   }
   localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+
+  // Sync to server (Admin: saves to Turso DB, General User: saved to local device)
+  try {
+    fetch('/api/laws/important-sections', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sectionId: note.sectionId,
+        bookId: lawInfo?.bookId,
+        sectionNumber: lawInfo?.sectionNumber,
+        title: lawInfo?.title,
+        note: note.text,
+        isHighlighted: Boolean(note.isHighlighted),
+        action: note.isHighlighted ? 'upsert' : 'delete'
+      })
+    }).catch(() => {});
+  } catch (e) {
+    // Offline ok
+  }
+
   return notes;
+};
+
+export const syncAdminImportantSections = async () => {
+  if (typeof window === 'undefined') return;
+  try {
+    const res = await fetch('/api/laws/important-sections');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.isAdmin && Array.isArray(data.sections)) {
+        const notes = getNotes();
+        let changed = false;
+        for (const sec of data.sections) {
+          if (!notes[sec.id]) {
+            notes[sec.id] = {
+              sectionId: sec.id,
+              text: sec.note || '',
+              updatedAt: Date.now(),
+              isHighlighted: true
+            };
+            changed = true;
+          } else if (!notes[sec.id].isHighlighted) {
+            notes[sec.id].isHighlighted = true;
+            if (sec.note && !notes[sec.id].text) {
+              notes[sec.id].text = sec.note;
+            }
+            changed = true;
+          }
+        }
+        if (changed) {
+          localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+        }
+      }
+    }
+  } catch (e) {
+    // Offline ok
+  }
 };
 
 export const deleteCustomLaw = (id: string) => {
@@ -341,7 +398,8 @@ export const importData = (jsonString: string): boolean => {
       const itemMap = new Map<string, MemorizationItem>();
       existingItems.forEach(i => itemMap.set(i.id, i));
       data.memoItems.forEach(i => itemMap.set(i.id, i));
-      localStorage.setItem(MEMO_ITEMS_KEY, JSON.stringify(Array.from(itemMap.values())));
+      const sorted = sortSectionsAscending(Array.from(itemMap.values()), i => i.sectionNumber || i.title, i => i.bookId);
+      localStorage.setItem(MEMO_ITEMS_KEY, JSON.stringify(sorted));
     }
 
     if (data.memoStats) {

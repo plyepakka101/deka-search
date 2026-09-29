@@ -1,10 +1,27 @@
 import { MemorizationDeck, MemorizationItem, MemorizationStats } from '../types';
 import { calculateNextSRS, ReviewRating } from './srsEngine';
 import { getLaws } from './dataService';
+import { compareSectionNumbers } from '@/utils/sectionSort';
 
 const MEMO_DECKS_KEY = 'thai_law_mate_memo_decks';
 const MEMO_ITEMS_KEY = 'thai_law_mate_memo_items';
 const MEMO_STATS_KEY = 'thai_law_mate_memo_stats';
+
+/**
+ * Sorts memorization items by section number ascending (1 -> 2 -> ... -> 59 -> ... -> 288 -> 288/1 -> ...)
+ */
+export function sortMemoItems(items: MemorizationItem[]): MemorizationItem[] {
+  return [...items].sort((a, b) => {
+    // 1. Group by deckId first
+    if (a.deckId !== b.deckId) {
+      return a.deckId.localeCompare(b.deckId);
+    }
+    // 2. Sort by section number ascending within deck
+    const secA = a.sectionNumber || a.title || '';
+    const secB = b.sectionNumber || b.title || '';
+    return compareSectionNumbers(secA, secB);
+  });
+}
 
 // Built-in starter decks per Law Book
 export const BUILTIN_DECKS: MemorizationDeck[] = [
@@ -126,7 +143,6 @@ const notify = () => listeners.forEach(fn => fn());
  * Hydrate item details (sectionNumber, content, bookId) from parsed laws
  */
 function hydrateItem(item: MemorizationItem, lawsCache?: ReturnType<typeof getLaws>): MemorizationItem {
-  if (item.content && item.sectionNumber && item.bookId) return item;
   const laws = lawsCache || getLaws();
   const law = laws.find(l => l.id === item.sectionId);
   if (law) {
@@ -136,6 +152,13 @@ function hydrateItem(item: MemorizationItem, lawsCache?: ReturnType<typeof getLa
       content: item.content || law.content,
       bookId: item.bookId || law.bookId
     };
+  }
+  if (!item.sectionNumber) {
+    const cleanTitle = item.title?.replace(/^(มาตรา|ม\.)\s*/, '') || '';
+    const match = cleanTitle.match(/^([0-9๐-๙]+(\/[0-9๐-๙]+)?(\s*(ทวิ|ตรี|จัตวา|เบญจ|ฉ|สัตต|อัฏฐ|นว|ทศ))?)/);
+    if (match) {
+      return { ...item, sectionNumber: match[1] };
+    }
   }
   return item;
 }
@@ -156,18 +179,24 @@ function ensureLocalSeed(): { decks: MemorizationDeck[]; items: MemorizationItem
 
   if (!items || items.length === 0) {
     const nowIso = new Date().toISOString();
-    items = STARTER_ITEMS.map(s => ({
-      id: `${s.deckId}_${s.sectionId}`,
-      deckId: s.deckId,
-      sectionId: s.sectionId,
-      title: s.title,
-      repetitions: 0,
-      intervalDays: 1,
-      easeFactor: 2.5,
-      streak: 0,
-      status: 'new' as const,
-      nextReviewAt: nowIso
-    }));
+    const rawItems = STARTER_ITEMS.map(s => {
+      const match = s.title.match(/มาตรา\s+([0-9]+(\/[0-9]+)?(\s*(ทวิ|ตรี|จัตวา|เบญจ|ฉ|สัตต|อัฏฐ|นว|ทศ))?)/);
+      const sectionNumber = match ? match[1] : '';
+      return {
+        id: `${s.deckId}_${s.sectionId}`,
+        deckId: s.deckId,
+        sectionId: s.sectionId,
+        title: s.title,
+        sectionNumber,
+        repetitions: 0,
+        intervalDays: 1,
+        easeFactor: 2.5,
+        streak: 0,
+        status: 'new' as const,
+        nextReviewAt: nowIso
+      };
+    });
+    items = sortMemoItems(rawItems);
     writeJson(MEMO_ITEMS_KEY, items);
     changed = true;
   }
@@ -209,27 +238,25 @@ export function getLocalDecks(): MemorizationDeck[] {
 }
 
 /**
- * Fetch items for a specific deck or all items
+ * Fetch items for a specific deck or all items, naturally sorted by section number ascending
  */
 export async function fetchItems(deckId?: string): Promise<MemorizationItem[]> {
   ensureLocalSeed();
   let local = readJson<MemorizationItem[]>(MEMO_ITEMS_KEY, []);
   const allLaws = getLaws();
-  local = local.map(i => hydrateItem(i, allLaws));
+  local = sortMemoItems(local.map(i => hydrateItem(i, allLaws)));
   
   try {
     const url = deckId ? `/api/memorize?deckId=${encodeURIComponent(deckId)}` : '/api/memorize';
     const res = await fetch(url);
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data.items)) {
+      if (Array.isArray(data.items) && data.items.length > 0) {
         const itemMap = new Map<string, MemorizationItem>();
         local.forEach(i => itemMap.set(i.id, i));
         data.items.forEach((i: MemorizationItem) => itemMap.set(i.id, hydrateItem(i, allLaws)));
-        const merged = Array.from(itemMap.values());
+        const merged = sortMemoItems(Array.from(itemMap.values()));
         writeJson(MEMO_ITEMS_KEY, merged);
-        if (data.decks) writeJson(MEMO_DECKS_KEY, data.decks);
-        if (data.stats) writeJson(MEMO_STATS_KEY, data.stats);
         notify();
         return deckId ? merged.filter(i => i.deckId === deckId) : merged;
       }
@@ -245,7 +272,7 @@ export function getLocalItems(deckId?: string): MemorizationItem[] {
   ensureLocalSeed();
   const all = readJson<MemorizationItem[]>(MEMO_ITEMS_KEY, []);
   const allLaws = getLaws();
-  const hydrated = all.map(i => hydrateItem(i, allLaws));
+  const hydrated = sortMemoItems(all.map(i => hydrateItem(i, allLaws)));
   return deckId ? hydrated.filter(i => i.deckId === deckId) : hydrated;
 }
 
@@ -325,17 +352,27 @@ export async function recordReview(
 }
 
 /**
- * Add a section to a deck
+ * Add a section to a deck, ensuring it is naturally sorted by section number ascending
  */
 export async function addSectionToDeck(deckId: string, sectionId: string, title?: string): Promise<boolean> {
+  const allLaws = getLaws();
+  const foundLaw = allLaws.find(l => l.id === sectionId);
+  const sectionNumber = foundLaw?.sectionNumber || title?.replace(/^(มาตรา|ม\.)\s*/, '').split(/[\s-]/)[0] || '';
+  const bookId = foundLaw?.bookId || deckId.replace('deck-', '');
+
   const localItems = readJson<MemorizationItem[]>(MEMO_ITEMS_KEY, []);
   const existing = localItems.find(i => i.deckId === deckId && i.sectionId === sectionId);
+  
+  let updatedItems = [...localItems];
   if (!existing) {
     const newItem: MemorizationItem = {
       id: `${deckId}_${sectionId}`,
       deckId,
       sectionId,
-      title: title || `มาตรา ${sectionId}`,
+      title: title || (foundLaw ? `มาตรา ${foundLaw.sectionNumber}` : `มาตรา ${sectionId}`),
+      sectionNumber,
+      content: foundLaw?.content,
+      bookId,
       repetitions: 0,
       intervalDays: 1,
       easeFactor: 2.5,
@@ -343,21 +380,35 @@ export async function addSectionToDeck(deckId: string, sectionId: string, title?
       status: 'new',
       nextReviewAt: new Date().toISOString()
     };
-    writeJson(MEMO_ITEMS_KEY, [newItem, ...localItems]);
-    notify();
+    updatedItems.push(newItem);
   }
 
+  // Always sort items by section number ascending (จากน้อยไปหามาก แม้จะเพิ่มเข้ามาทีหลัง)
+  updatedItems = sortMemoItems(updatedItems.map(i => hydrateItem(i, allLaws)));
+  writeJson(MEMO_ITEMS_KEY, updatedItems);
+  notify();
+
+  // If Admin: saves to DB via /api/memorize. If regular user: stays in local device.
   try {
     const res = await fetch('/api/memorize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'add_item',
-        payload: { deckId, sectionId, title }
+        payload: { 
+          deckId, 
+          sectionId, 
+          title: title || (foundLaw ? `มาตรา ${foundLaw.sectionNumber}` : `มาตรา ${sectionId}`), 
+          sectionNumber, 
+          bookId 
+        }
       })
     });
     if (res.ok) {
-      await fetchItems();
+      const data = await res.json();
+      if (data.savedToDb) {
+        await fetchItems();
+      }
       return true;
     }
   } catch (e) {

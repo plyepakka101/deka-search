@@ -102,3 +102,51 @@ model ExamQuestion {
   @@index([examYear])
 }
 
+model AdminMemorizeItem {
+  id           String   @id
+  deckId       String
+  sectionId    String
+  title        String
+  sectionNumber String?
+  bookId       String?
+  repetitions  Int      @default(0)
+  intervalDays Int      @default(1)
+  easeFactor   Float    @default(2.5)
+  streak       Int      @default(0)
+  status       String   @default("new")
+  nextReviewAt String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([deckId, sectionId])
+  @@index([deckId])
+  @@index([sectionId])
+}
+
+model AdminImportantSection {
+  id            String   @id
+  bookId        String?
+  sectionNumber String
+  title         String?
+  note          String?
+  isHighlighted Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([bookId])
+}
+
+model AdminBookmark {
+  id             String   @id
+  decisionNumber String
+  decisionYear   Int?
+  parties        String?
+  shortSummary   String?
+  timestamp      Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([decisionYear])
+}
+
+

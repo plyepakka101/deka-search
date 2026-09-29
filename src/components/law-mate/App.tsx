@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ViewState, LawSection, UserNote, AppSettings, LawBook } from './types';
-import { getLaws, getNotes, saveNote, saveCustomLaw, deleteCustomLaw, getSettings, saveSettings, getBooks, initLawsData } from './services/dataService';
+import { getLaws, getNotes, saveNote, saveCustomLaw, deleteCustomLaw, getSettings, saveSettings, getBooks, initLawsData, syncAdminImportantSections } from './services/dataService';
 import { LawCard } from './components/LawCard';
 import { LawEditor } from './components/LawEditor';
 import { TOCView } from './components/TOCView';
@@ -8,6 +8,7 @@ import { Bookshelf } from './components/Bookshelf';
 import { MemorizeHub } from './components/MemorizeHub';
 import { Home, Search, BookMarked, PlusSquare, Scale, ExternalLink, List, Star, Library, ChevronLeft, Info, Loader2, Brain } from 'lucide-react';
 import { normalizeSearchQuery, thaiToArabic } from './utils/textUtils';
+import { sortSectionsAscending } from '@/utils/sectionSort';
 
 import FontSizeController from '@/components/FontSizeController';
 
@@ -28,12 +29,13 @@ const App: React.FC = () => {
 
   // Initial Data Load
   useEffect(() => {
-    initLawsData().then(() => {
-      setLaws(getLaws());
-      setNotes(getNotes());
-      const savedSettings = getSettings();
-      setSettings(savedSettings);
-      setIsLoading(false);
+    initLawsData().then(async () => {
+       setLaws(getLaws());
+       await syncAdminImportantSections();
+       setNotes(getNotes());
+       const savedSettings = getSettings();
+       setSettings(savedSettings);
+       setIsLoading(false);
     });
   }, []);
 
@@ -75,7 +77,12 @@ const App: React.FC = () => {
   }, [laws]); 
 
   const handleSaveNote = (note: UserNote) => {
-    const updatedNotes = saveNote(note);
+    const currentLaw = laws.find(l => l.id === note.sectionId);
+    const updatedNotes = saveNote(note, {
+      sectionNumber: currentLaw?.sectionNumber,
+      bookId: currentLaw?.bookId,
+      title: currentLaw ? `มาตรา ${currentLaw.sectionNumber}` : undefined
+    });
     setNotes({...updatedNotes});
   };
 
@@ -191,14 +198,16 @@ const App: React.FC = () => {
     }
 
     if (view === ViewState.NOTES) {
-      return scopeLaws.filter(law => {
+      const noted = scopeLaws.filter(law => {
           const note = notes[law.id];
           return note && ((note.text && note.text.trim().length > 0) || (note.linkedDekaIds && note.linkedDekaIds.length > 0));
       });
+      return sortSectionsAscending(noted, l => l.sectionNumber, l => l.bookId);
     }
 
     if (view === ViewState.HIGHLIGHTS) {
-        return scopeLaws.filter(law => notes[law.id]?.isHighlighted);
+        const highlighted = scopeLaws.filter(law => notes[law.id]?.isHighlighted);
+        return sortSectionsAscending(highlighted, l => l.sectionNumber, l => l.bookId);
     }
 
     if (!searchQuery.trim() && view !== ViewState.SEARCH) {
