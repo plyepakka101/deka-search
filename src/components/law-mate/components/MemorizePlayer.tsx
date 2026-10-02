@@ -9,7 +9,7 @@ import { sliceParagraphs } from '../services/paragraphSlicer';
 import { generateClozeBlanks } from '../services/keywordExtractor';
 import { recordReview } from '../services/memorizeService';
 import { ReviewRating } from '../services/srsEngine';
-import { getSettings } from '../services/dataService';
+import { getSettings, getLaws } from '../services/dataService';
 import { thaiToArabic } from '../utils/textUtils';
 
 export const getSectionNumber = (item?: MemorizationItem): string => {
@@ -89,8 +89,15 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
   const currentItem = items[currentIndex];
   const total = items.length;
 
-  // Split paragraphs
-  const rawText = currentItem?.customText || currentItem?.content || '';
+  // Split paragraphs and fallback to getLaws() if currentItem.content is missing
+  const allLaws = getLaws();
+  const matchedLaw = allLaws.find(l => 
+    (currentItem?.sectionId && l.id === currentItem.sectionId) || 
+    (l.bookId && currentItem?.bookId && l.bookId === currentItem.bookId && l.sectionNumber && currentItem?.sectionNumber && l.sectionNumber === currentItem.sectionNumber) ||
+    (l.sectionNumber && currentItem?.sectionNumber && l.sectionNumber === currentItem.sectionNumber)
+  );
+
+  const rawText = (currentItem?.customText || currentItem?.content || matchedLaw?.content || '').trim();
   const paragraphs = sliceParagraphs(rawText);
 
   // Active text based on paragraph selection
@@ -232,7 +239,7 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
     }
     if (nextVal && currentItem) {
       const secNum = getSectionNumber(currentItem);
-      playSingleTTS(`เปิดอ่านเลขมาตราอัตโนมัติ มาตรา ${secNum}`);
+      playSingleTTS(`เปิดอ่านอัตโนมัติ มาตรา ${secNum}`);
     }
   };
 
@@ -243,43 +250,52 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
       return;
     }
     if (autoAnnounceSection && currentItem) {
-      const secNum = getSectionNumber(currentItem);
-      const pLabel = selectedParagraphIdx > 0 ? (paragraphs[selectedParagraphIdx - 1]?.label || '') : '';
-      const text = pLabel ? (secNum ? `มาตรา ${secNum} ${pLabel}` : pLabel) : (secNum ? `มาตรา ${secNum}` : currentItem.title || 'มาตรา');
+      // When moving to another card, announce both Section Number and Content
+      const textToSpeak = getFullSpeechText(currentItem, activeText, selectedParagraphIdx);
       const timer = setTimeout(() => {
-        playSingleTTS(text);
-      }, 300);
+        playSingleTTS(textToSpeak);
+      }, 350);
       return () => clearTimeout(timer);
     }
   }, [currentIndex, autoAnnounceSection]);
 
   // -------------------------------------------------------------------
-  // Helpers to construct speech text that always includes Section Number
+  // Helpers to construct speech text that always includes Section Number AND Content
   // -------------------------------------------------------------------
   const getFullSpeechText = (item: MemorizationItem, text: string, paragraphIdx: number): string => {
-    const cleanBody = text.replace(/\[\d+\]/g, '').trim();
+    const rawContent = (text || matchedLaw?.content || item?.content || item?.customText || '').trim();
+    // Remove footnote markers [1], [120]
+    let cleanBody = rawContent.replace(/\[\d+\]/g, '').trim();
+
     const secNum = getSectionNumber(item);
     const secLabel = secNum ? `มาตรา ${secNum}` : '';
 
     if (paragraphIdx === 0) {
       if (!secLabel) return cleanBody;
-      if (cleanBody.startsWith(secLabel)) {
-        return cleanBody;
+
+      // If cleanBody already starts with "มาตรา [secNum]" or similar
+      const prefixRegex = new RegExp(`^(?:มาตรา|ม\\.)\\s*${secNum}\\.?\\s*`, 'i');
+      if (prefixRegex.test(cleanBody)) {
+        cleanBody = cleanBody.replace(prefixRegex, '').trim();
+      } else if (cleanBody.startsWith('มาตรา ')) {
+        const generalSecMatch = cleanBody.match(/^มาตรา\s+[^\s.]+\.?\s*/);
+        if (generalSecMatch) {
+          cleanBody = cleanBody.substring(generalSecMatch[0].length).trim();
+        }
       }
-      if (cleanBody.startsWith('มาตรา')) {
-        return cleanBody;
-      }
-      return `${secLabel}. ${cleanBody}`;
+
+      return cleanBody ? `${secLabel}. ${cleanBody}` : secLabel;
     } else {
       const pLabel = paragraphs[paragraphIdx - 1]?.label || `วรรค ${paragraphIdx}`;
       const fullPrefix = secLabel ? `${secLabel} ${pLabel}` : pLabel;
-      if (cleanBody.startsWith(fullPrefix)) {
-        return cleanBody;
+
+      // Remove existing prefix if already present
+      const pPrefixRegex = new RegExp(`^(?:${secLabel}\\s+)?${pLabel}\\.?\\s*`, 'i');
+      if (pPrefixRegex.test(cleanBody)) {
+        cleanBody = cleanBody.replace(pPrefixRegex, '').trim();
       }
-      if (cleanBody.startsWith(pLabel)) {
-        return secLabel ? `${secLabel} ${cleanBody}` : cleanBody;
-      }
-      return `${fullPrefix}. ${cleanBody}`;
+
+      return cleanBody ? `${fullPrefix}. ${cleanBody}` : fullPrefix;
     }
   };
 
@@ -559,12 +575,12 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
               </span>
               <button
                 type="button"
-                onClick={handleSpeakSectionOnly}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 text-xs font-medium border border-amber-200 dark:border-amber-800 transition cursor-pointer"
-                title="กดเพื่อฟังเสียงอ่านเลขมาตรานี้"
+                onClick={handlePlayOnce}
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 text-xs font-semibold border border-amber-200 dark:border-amber-800 transition cursor-pointer"
+                title="กดเพื่อฟังเสียงอ่านเลขมาตราพร้อมเนื้อหาตัวบท"
               >
                 <Volume2 size={13} className="text-amber-600 dark:text-amber-400" />
-                <span>อ่านเลขมาตรา</span>
+                <span>อ่านมาตรานี้</span>
               </button>
             </div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mt-1">
@@ -586,7 +602,7 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
               <option value="1.5">1.5x</option>
             </select>
 
-            {/* Toggle Auto Announce Section */}
+            {/* Toggle Auto Announce Section + Content */}
             <button
               type="button"
               onClick={toggleAutoAnnounce}
@@ -595,10 +611,10 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
                   ? 'bg-amber-500 text-white border-amber-600 shadow-2xs'
                   : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border-gray-200 dark:border-gray-700'
               }`}
-              title="เปิด/ปิดการอ่านเลขมาตราโดยอัตโนมัติเมื่อกดเลื่อนข้อถัดไปหรือก่อนหน้า"
+              title="เปิด/ปิดการอ่านเลขมาตราและเนื้อหาอัตโนมัติเมื่อกดเลื่อนข้อถัดไปหรือก่อนหน้า"
             >
               <Volume2 size={13} />
-              <span>อ่านเลขอัตโนมัติ: {autoAnnounceSection ? 'เปิด' : 'ปิด'}</span>
+              <span>อ่านอัตโนมัติเมื่อเลื่อนข้อ: {autoAnnounceSection ? 'เปิด' : 'ปิด'}</span>
             </button>
 
             {/* Single Play / Loop Toggle */}
