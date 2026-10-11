@@ -384,30 +384,32 @@ export default function ExamRoomPage() {
                 </div>
               </div>
 
-              {/* Citations Preview on Left Panel */}
-              <div className="space-y-2 pt-2 border-t border-slate-100">
-                <div className="text-xs font-semibold text-slate-400">มาตราและฎีกาที่เกี่ยวข้องในข้อนี้:</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {question.relatedSections?.map((s: any, idx: number) => (
-                    <span key={idx} className="text-xs px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg font-medium flex items-center gap-1">
-                      <BookOpen size={12} />
-                      <span>{s.law ? `${s.law} ` : ''}ม.{s.section}</span>
-                    </span>
-                  ))}
+              {/* Citations Preview on Left Panel (แสดงเมื่อกดดูธงคำตอบแล้วเท่านั้น) */}
+              {isAnswerRevealed && (
+                <div className="space-y-2 pt-2 border-t border-slate-100 animate-in fade-in duration-200">
+                  <div className="text-xs font-semibold text-slate-400">มาตราและฎีกาที่เกี่ยวข้องในข้อนี้:</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {question.relatedSections?.map((s: any, idx: number) => (
+                      <span key={idx} className="text-xs px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg font-medium flex items-center gap-1">
+                        <BookOpen size={12} />
+                        <span>{s.law ? `${s.law} ` : ''}ม.{s.section}</span>
+                      </span>
+                    ))}
 
-                  {question.dekaDetails?.map((d: any, idx: number) => (
-                    <button
-                      key={idx}
-                      onClick={() => setActiveDeka(d)}
-                      className="text-xs px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg font-medium flex items-center gap-1 transition-colors cursor-pointer"
-                    >
-                      <Scale size={12} />
-                      <span>ฎีกา {d.number}</span>
-                      <ExternalLink size={11} className="opacity-70" />
-                    </button>
-                  ))}
+                    {question.dekaDetails?.map((d: any, idx: number) => (
+                      <button
+                        key={idx}
+                        onClick={() => setActiveDeka(d)}
+                        className="text-xs px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        <Scale size={12} />
+                        <span>ฎีกา {d.number}</span>
+                        <ExternalLink size={11} className="opacity-70" />
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 
@@ -752,6 +754,24 @@ export default function ExamRoomPage() {
                     {question.officialAnswer}
                   </div>
                 </div>
+
+                {/* Related Sections Tags in Solution */}
+                {question.relatedSections && question.relatedSections.length > 0 && (
+                  <div className="space-y-2 pt-4 border-t border-slate-100">
+                    <div className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+                      <BookOpen size={15} className="text-blue-600" />
+                      <span>บทบัญญัติ / มาตราที่เกี่ยวข้องในธงคำตอบ</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {question.relatedSections.map((s: any, idx: number) => (
+                        <span key={idx} className="text-xs px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg font-medium flex items-center gap-1">
+                          <BookOpen size={12} />
+                          <span>{s.law ? `${s.law} ` : ''}ม.{s.section}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Related Dekas Interactive Cards */}
                 <div className="space-y-3 pt-4 border-t border-slate-100">
