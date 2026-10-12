@@ -5,12 +5,84 @@ import { sortSectionsAscending } from '@/utils/sectionSort';
 
 let cachedBooks: LawBook[] = [];
 let cachedLaws: LawSection[] = [];
+let initPromise: Promise<void> | null = null;
+
+const IDB_NAME = 'thai_law_mate_cache';
+const IDB_STORE = 'laws_store';
+const IDB_KEY = 'parsed_laws_v1';
+
+async function getFromIndexedDB(): Promise<{ books: LawBook[]; laws: LawSection[] } | null> {
+  if (typeof window === 'undefined' || !('indexedDB' in window)) return null;
+  return new Promise((resolve) => {
+    try {
+      const request = indexedDB.open(IDB_NAME, 1);
+      request.onupgradeneeded = (e: any) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(IDB_STORE)) {
+          db.createObjectStore(IDB_STORE);
+        }
+      };
+      request.onsuccess = (e: any) => {
+        const db = e.target.result;
+        const tx = db.transaction(IDB_STORE, 'readonly');
+        const store = tx.objectStore(IDB_STORE);
+        const getReq = store.get(IDB_KEY);
+        getReq.onsuccess = () => resolve(getReq.result || null);
+        getReq.onerror = () => resolve(null);
+      };
+      request.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+async function saveToIndexedDB(data: { books: LawBook[]; laws: LawSection[] }): Promise<void> {
+  if (typeof window === 'undefined' || !('indexedDB' in window)) return;
+  return new Promise((resolve) => {
+    try {
+      const request = indexedDB.open(IDB_NAME, 1);
+      request.onsuccess = (e: any) => {
+        const db = e.target.result;
+        const tx = db.transaction(IDB_STORE, 'readwrite');
+        const store = tx.objectStore(IDB_STORE);
+        store.put(data, IDB_KEY);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+      };
+      request.onerror = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
+}
 
 export const initLawsData = async () => {
-  if (cachedBooks.length > 0) return;
-  const res = await fetch('/api/laws/books?includeContent=true');
-  cachedBooks = await res.json();
-  cachedLaws = cachedBooks.flatMap(book => parseLaws(book.content, book.id, book.name));
+  if (cachedBooks.length > 0 && cachedLaws.length > 0) return;
+  if (initPromise) return initPromise;
+
+  initPromise = (async () => {
+    // 1. Try reading instantly from IndexedDB cache
+    const idbCached = await getFromIndexedDB();
+    if (idbCached && Array.isArray(idbCached.books) && Array.isArray(idbCached.laws) && idbCached.laws.length > 0) {
+      cachedBooks = idbCached.books;
+      cachedLaws = idbCached.laws;
+      return;
+    }
+
+    // 2. Fallback to API if not cached yet
+    const res = await fetch('/api/laws/books?includeContent=true');
+    const books = await res.json();
+    cachedBooks = books;
+    cachedLaws = books.flatMap((book: any) => parseLaws(book.content, book.id, book.name));
+
+    // Save to IndexedDB in background
+    saveToIndexedDB({ books: cachedBooks, laws: cachedLaws }).catch(() => {});
+  })().finally(() => {
+    initPromise = null;
+  });
+
+  return initPromise;
 };
 
 const CUSTOM_LAWS_KEY = 'thai_law_mate_custom_laws';

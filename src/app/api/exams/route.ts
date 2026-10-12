@@ -91,6 +91,10 @@ export async function GET(request: Request) {
       },
       categoryStats,
       totalAllCategories
+    }, {
+      headers: {
+        'Cache-Control': 'public, max-age=120, stale-while-revalidate=600',
+      },
     });
   } catch (error: any) {
     console.error('Error fetching exams:', error);

@@ -1,0 +1,72 @@
+@media screen and (min-width:981px){
+	.newslist li:nth-child(3n+3){ margin-right: 0;}
+    .search-form input[type="text"], .search-form input[type="password"], .search-form  select{ width: 400px; }
+    .search-form  select.law, .search-form input[type="text"].law-name { width: 250px; }
+	
+	.search-form input[type="text"].law { width: 60px; } 
+	
+	.text-align{ text-align: center; }
+	.index { width: 100px; }
+	.amount { width: 150px; }
+}
+
+@media screen and (max-width:980px){
+    .container{ max-width: 740px;}
+    .search-form:not(.searchlaw)  li{ width: 48.5%; margin-right: 3%;}
+    .search-form li:nth-child(2n+2){ margin-right: 0;}
+    .search-form input[type="text"], select{ width: 400px; }
+    .datesearchb{ width: 45%;}
+    .search-form .between{ width: 10%; text-align: center; margin: 0; margin: 0;}
+    .search-form .endtext{width: 100%;}
+    .search-form .search{ margin: 0;}
+    .search-form .m-center{ text-align: center;}
+}
+
+@media screen and (max-width:730px){
+    .container{ max-width: 510px;}
+    .search-form:not(.fullrow) li { width: 100%; padding-left: 0; }
+    .search-form:not(.between) span { margin: 0;}
+	#btn-show-result-item, #show-result-item { display: none;}
+    .search-form input[type="text"], select{ width: 100%; }
+}
+
+@media screen and (max-width:600px){
+	.navbar-brand { display: none; }
+	.navbar-login { display: none; }
+    .search-form:not(.fullrow) li { width: 100%; padding-left: 0; }
+    .search-form:not(.between) span { margin: 0;}
+    .search-form input[type="text"], select{ width: 100%; }
+	.search-form li.fullrow-non-label { padding-left: 0; }
+	button.control { margin-top: 5px;}
+	#btn-show-result-item, #show-result-item { display: none;}
+	footer { margin-top: 10px;}
+	
+	.text-align { text-align: left; }
+	
+	table#result thead {
+		display: none; 
+	}
+	table#result tbody td {
+		display: block;
+		padding: .6rem; 
+	}
+	table#result tbody tr td:first-child {
+		background: #333;
+		color: #fff; 
+	}
+	table#result tbody td:before {
+		content: attr(data-th);
+		font-weight: bold;
+		display: inline-block;
+		width: 6rem; 
+	}
+}
+
+@media screen and ( max-width:480px ) {
+	/* .navbar-brand .logo { display: none; } */
+    .search-form:not(.fullrow) li, .search-form:not(.fullrow-non-label) li , .search-form label{ width: 100% !important ; padding-left: 0 !important; }
+    .search-form:not(.between) span { margin: 0 5px; width: auto; }
+    .search-form input[type="text"], select{ width: 100%; }
+	button.control { margin-top: 5px;}
+	#btn-show-result-item, #show-result-item { display: none;}
+}

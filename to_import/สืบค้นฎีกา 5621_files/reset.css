@@ -1,0 +1,27 @@
+* { margin: 0; padding: 0; }
+html, body, div, h1, h2, h3, h4, h5, h6, ul, ol, dl, li, dt, dd, p, blockquote, pre, form, fieldset, table, th, td {
+	margin: 0; padding: 0; 
+}
+
+a img, input, select, fieldset {
+	border: 0;
+	outline:none;
+}
+
+img{
+	height:auto;
+	vertical-align:middle;
+	outline:none;
+}
+
+a {
+	color: #000; text-decoration: none; outline:none;}
+a:hover {text-decoration:none; outline:none;}
+a:visited ,a:active{outline:none;}
+h1, h2, h3, h4, h5, h6 { float: none; margin: 0px; padding: 0px; font-weight: normal; }
+ul, li { line-height: normal; list-style-type: none; margin: 0; padding: 0; }
+.ui-autocomplete.ui-menu.ui-widget.ui-widget-content.ui-corner-all .ui-menu-item{
+	padding-top: 7px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid #c1c1c1;
+}

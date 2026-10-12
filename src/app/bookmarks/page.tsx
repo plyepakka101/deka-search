@@ -29,6 +29,7 @@ export default function BookmarksPage() {
   const [lawSearchQuery, setLawSearchQuery] = useState("");
 
   const loadImportantLaws = async () => {
+    if (isLawsLoaded) return;
     try {
       await initLawsData();
       await syncAdminImportantSections();
@@ -50,9 +51,12 @@ export default function BookmarksPage() {
     }
   };
 
+  // Load important laws only when user visits the "laws" tab, or idle in background
   useEffect(() => {
-    loadImportantLaws();
-  }, []);
+    if (activeTab === "laws") {
+      loadImportantLaws();
+    }
+  }, [activeTab]);
 
   const handleToggleLawHighlight = (law: LawSection) => {
     const currentNote = notes[law.id] || {

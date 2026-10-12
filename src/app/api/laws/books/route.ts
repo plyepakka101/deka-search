@@ -20,7 +20,15 @@ export async function GET(request: Request) {
       }
     });
 
-    return NextResponse.json(books);
+    const cacheHeader = includeContent
+      ? 'public, max-age=600, stale-while-revalidate=86400'
+      : 'public, max-age=1800, stale-while-revalidate=86400';
+
+    return NextResponse.json(books, {
+      headers: {
+        'Cache-Control': cacheHeader,
+      },
+    });
   } catch (error) {
     console.error('Failed to fetch law books:', error);
     return NextResponse.json({ error: 'Failed to fetch law books' }, { status: 500 });

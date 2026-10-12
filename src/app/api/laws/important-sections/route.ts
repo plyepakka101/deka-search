@@ -18,6 +18,10 @@ export async function GET() {
       success: true,
       isAdmin,
       sections: sorted,
+    }, {
+      headers: {
+        'Cache-Control': 'public, max-age=180, stale-while-revalidate=86400',
+      },
     });
   } catch (error: any) {
     console.error('Failed to fetch important sections:', error);

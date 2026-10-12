@@ -62,6 +62,7 @@ export default function Navbar({ session }: { session: any }) {
             <nav className="hidden xl:flex items-center gap-1 text-sm font-medium text-slate-600">
               <Link
                 href="/"
+                prefetch={true}
                 className={`px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap ${
                   isActive("/") && pathname === "/"
                     ? "text-primary font-bold bg-primary/5"
@@ -72,6 +73,7 @@ export default function Navbar({ session }: { session: any }) {
               </Link>
               <Link
                 href="/search?tab=law"
+                prefetch={true}
                 className={`px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap ${
                   pathname === "/search"
                     ? "text-primary font-bold bg-primary/5"
@@ -82,12 +84,14 @@ export default function Navbar({ session }: { session: any }) {
               </Link>
               <Link
                 href="/search?tab=year"
+                prefetch={true}
                 className="px-3 py-1.5 rounded-lg hover:text-primary hover:bg-slate-50 transition-colors whitespace-nowrap"
               >
                 แยกตามปี พ.ศ.
               </Link>
               <Link
                 href="/laws"
+                prefetch={true}
                 className={`px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap flex items-center gap-1.5 ${
                   isActive("/laws") && !pathname.includes("#memorize")
                     ? "text-primary font-bold bg-primary/5"
@@ -99,6 +103,7 @@ export default function Navbar({ session }: { session: any }) {
               </Link>
               <Link
                 href="/laws#memorize"
+                prefetch={true}
                 className="px-3 py-1.5 rounded-lg text-purple-700 hover:text-purple-800 hover:bg-purple-50 font-semibold transition-colors whitespace-nowrap flex items-center gap-1.5"
               >
                 <Brain className="w-4 h-4 text-purple-600" />
@@ -106,6 +111,7 @@ export default function Navbar({ session }: { session: any }) {
               </Link>
               <Link
                 href="/exams"
+                prefetch={true}
                 className={`px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap flex items-center gap-1.5 font-semibold ${
                   isActive("/exams")
                     ? "text-indigo-700 font-bold bg-indigo-50 border border-indigo-200/60 shadow-2xs"
@@ -117,6 +123,7 @@ export default function Navbar({ session }: { session: any }) {
               </Link>
               <Link
                 href="/bookmarks"
+                prefetch={true}
                 className={`px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap flex items-center gap-1.5 ${
                   isActive("/bookmarks")
                     ? "text-primary font-bold bg-primary/5"
@@ -128,6 +135,7 @@ export default function Navbar({ session }: { session: any }) {
               </Link>
               <Link
                 href="/settings"
+                prefetch={true}
                 className={`px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap flex items-center gap-1.5 ${
                   isActive("/settings")
                     ? "text-primary font-bold bg-primary/5"
@@ -143,12 +151,14 @@ export default function Navbar({ session }: { session: any }) {
             <nav className="hidden lg:flex xl:hidden items-center gap-1 text-sm font-medium text-slate-600">
               <Link
                 href="/"
+                prefetch={true}
                 className="px-2.5 py-1.5 rounded-lg hover:text-primary hover:bg-slate-50 transition-colors whitespace-nowrap"
               >
                 หน้าแรก
               </Link>
               <Link
                 href="/laws"
+                prefetch={true}
                 className="px-2.5 py-1.5 rounded-lg hover:text-primary hover:bg-slate-50 transition-colors whitespace-nowrap flex items-center gap-1"
               >
                 <BookOpen className="w-4 h-4 text-slate-400" />
@@ -156,6 +166,7 @@ export default function Navbar({ session }: { session: any }) {
               </Link>
               <Link
                 href="/laws#memorize"
+                prefetch={true}
                 className="px-2.5 py-1.5 rounded-lg text-purple-700 hover:bg-purple-50 font-semibold transition-colors whitespace-nowrap flex items-center gap-1"
               >
                 <Brain className="w-4 h-4 text-purple-600" />
@@ -163,6 +174,7 @@ export default function Navbar({ session }: { session: any }) {
               </Link>
               <Link
                 href="/exams"
+                prefetch={true}
                 className="px-2.5 py-1.5 rounded-lg text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100 font-semibold transition-colors whitespace-nowrap flex items-center gap-1 border border-indigo-200/50"
               >
                 <GraduationCap className="w-4 h-4 text-indigo-600" />
@@ -170,6 +182,7 @@ export default function Navbar({ session }: { session: any }) {
               </Link>
               <Link
                 href="/bookmarks"
+                prefetch={true}
                 className="px-2.5 py-1.5 rounded-lg hover:text-primary hover:bg-slate-50 transition-colors whitespace-nowrap flex items-center gap-1"
               >
                 <Bookmark className="w-4 h-4 text-slate-400" />
@@ -177,6 +190,7 @@ export default function Navbar({ session }: { session: any }) {
               </Link>
               <Link
                 href="/settings"
+                prefetch={true}
                 className={`px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap flex items-center gap-1 ${
                   isActive("/settings")
                     ? "text-primary font-bold bg-primary/5"
