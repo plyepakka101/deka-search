@@ -1,7 +1,7 @@
 import { LawSection, UserNote, BackupData, AppSettings, LawBook, ExportOptions, MemorizationDeck, MemorizationItem, MemorizationStats } from '../types';
 import { parseLaws } from './lawParser';
 import { thaiToArabic } from '../utils/textUtils';
-import { sortSectionsAscending } from '@/utils/sectionSort';
+import { sortSectionsAscending, compareSectionNumbers } from '@/utils/sectionSort';
 
 let cachedBooks: LawBook[] = [];
 let cachedLaws: LawSection[] = [];
@@ -9,7 +9,7 @@ let initPromise: Promise<void> | null = null;
 
 const IDB_NAME = 'thai_law_mate_cache';
 const IDB_STORE = 'laws_store';
-const IDB_KEY = 'parsed_laws_v1';
+const IDB_KEY = 'parsed_laws_v2';
 
 async function getFromIndexedDB(): Promise<{ books: LawBook[]; laws: LawSection[] } | null> {
   if (typeof window === 'undefined' || !('indexedDB' in window)) return null;
@@ -113,40 +113,6 @@ export const getLaws = (): LawSection[] => {
 
   const allLaws = Array.from(lawMap.values());
 
-  const parseSectionComponents = (s: string) => {
-      let clean = thaiToArabic(s).trim();
-      let main = 0;
-      let sub = 0;
-      let suffixVal = 0;
-
-      const suffixes = [
-        { key: 'ทวิ', val: 1 }, { key: 'ตรี', val: 2 }, { key: 'จัตวา', val: 3 },
-        { key: 'เบญจ', val: 4 }, { key: 'ฉ', val: 6 }, { key: 'สัตต', val: 7 },
-        { key: 'อัฏฐ', val: 8 }, { key: 'นว', val: 9 }, { key: 'ทศ', val: 10 }
-      ];
-
-      for (const suf of suffixes) {
-          if (clean.includes(suf.key)) {
-              suffixVal = suf.val;
-              clean = clean.replace(suf.key, '').trim();
-              break;
-          }
-      }
-
-      if (clean.includes('/')) {
-          const parts = clean.split('/');
-          const p0 = parseFloat(parts[0]);
-          const p1 = parseFloat(parts[1]);
-          main = isNaN(p0) ? 0 : p0;
-          sub = isNaN(p1) ? 0 : p1;
-      } else {
-          const p = parseFloat(clean);
-          main = isNaN(p) ? 0 : p;
-      }
-      
-      return { main, sub, suffixVal };
-  };
-
   return allLaws.sort((a, b) => {
       const bookIndexA = cachedBooks.findIndex(book => book.id === a.bookId);
       const bookIndexB = cachedBooks.findIndex(book => book.id === b.bookId);
@@ -161,16 +127,7 @@ export const getLaws = (): LawSection[] => {
       if (a.isCustom && !a.bookId) return 1;
       if (b.isCustom && !b.bookId) return -1;
 
-      const valA = parseSectionComponents(a.sectionNumber);
-      const valB = parseSectionComponents(b.sectionNumber);
-
-      if (valA.main !== valB.main) {
-          return valA.main - valB.main;
-      }
-      if (valA.suffixVal !== valB.suffixVal) {
-          return valA.suffixVal - valB.suffixVal;
-      }
-      return valA.sub - valB.sub;
+      return compareSectionNumbers(a.sectionNumber, b.sectionNumber);
   });
 };
 

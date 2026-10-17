@@ -35,6 +35,7 @@ const SUFFIX_MAP: Array<{ key: string; val: number }> = [
   { key: 'ฉ', val: 6 },
   { key: 'สัตต', val: 7 },
   { key: 'อัฏฐ', val: 8 },
+  { key: 'อัฎฐ', val: 8 },
   { key: 'นว', val: 9 },
   { key: 'ทศ', val: 10 }
 ];
