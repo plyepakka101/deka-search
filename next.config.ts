@@ -1,4 +1,6 @@
 import withPWAInit from "@ducanh2912/next-pwa";
+import path from "path";
+import type { NextConfig } from "next";
 
 const withPWA = withPWAInit({
   dest: "public",
@@ -6,10 +8,10 @@ const withPWA = withPWAInit({
   register: true,
 });
 
-import type { NextConfig } from "next";
-
 const nextConfig: NextConfig = {
-  turbopack: {},
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
   /* config options here */
 };
 
