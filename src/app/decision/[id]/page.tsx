@@ -6,6 +6,7 @@ import PrintButton from "@/components/PrintButton";
 import BookmarkButton from "@/components/BookmarkButton";
 import { TextWithLawLinks } from "@/components/TextWithLawLinks";
 import CitationCopyButton from "@/components/CitationCopyButton";
+import OfficialDekaSearchButton from "@/components/OfficialDekaSearchButton";
 import FontSizeController from "@/components/FontSizeController";
 import React from 'react';
 import LawLinkList from "@/components/LawLinkList";
@@ -55,6 +56,7 @@ export default async function DecisionDetailPage({ params }: { params: Promise<{
             citationText={`คำพิพากษาศาลฎีกาที่ ${decision.decisionNumber} (พ.ศ. ${decision.decisionYear}) - ${decision.parties || ""}`}
             className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm"
           />
+          <OfficialDekaSearchButton decisionNumber={decision.decisionNumber} />
           <BookmarkButton decision={{
             id: decision.id,
             decisionNumber: decision.decisionNumber,
