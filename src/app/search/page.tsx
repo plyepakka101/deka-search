@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { Search, Filter, FileText, ChevronRight, Hash } from "lucide-react";
 import BookmarkButton from "@/components/BookmarkButton";
+import OfficialDekaSearchButton from "@/components/OfficialDekaSearchButton";
 import PinToSectionButton from "@/components/PinToSectionButton";
 import PopularSearches from "@/components/PopularSearches";
 import BooleanSearchInput from "@/components/BooleanSearchInput";
@@ -426,6 +427,7 @@ export default async function SearchPage({
                           sectionNumber={section} 
                         />
                       )}
+                      <OfficialDekaSearchButton decisionNumber={decision.decisionNumber} />
                       <BookmarkButton decision={{
                         id: decision.id,
                         decisionNumber: decision.decisionNumber,
@@ -495,6 +497,7 @@ export default async function SearchPage({
                       </span>
                     )}
                   </div>
+                  <OfficialDekaSearchButton decisionNumber={decision.decisionNumber} />
                   <BookmarkButton decision={{
                     id: decision.id,
                     decisionNumber: decision.decisionNumber,
