@@ -12,6 +12,9 @@ export const LAW_MAP: Record<string, string> = {
   'ป.ยาเสพติด': 'ประมวลกฎหมายยาเสพติด',
   'พ.ร.บ.จราจรทางบก': 'พระราชบัญญัติจราจรทางบก พ.ศ. 2522',
   'พระราชบัญญัติจราจรทางบก': 'พระราชบัญญัติจราจรทางบก พ.ศ. 2522',
+  'พ.ร.บ.ล้มละลาย': 'พระราชบัญญัติล้มละลาย',
+  'พ.ร.บ. ล้มละลาย': 'พระราชบัญญัติล้มละลาย',
+  'พระราชบัญญัติล้มละลาย': 'พระราชบัญญัติล้มละลาย',
   'อาชญา': 'กฎหมายลักษณะอาญา',
 };
 
@@ -31,7 +34,7 @@ export function normalizeLawName(name: string): string {
   return normalized;
 }
 
-const VALID_SUFFIXES = ['ทวิ', 'ตรี', 'จัตวา', 'เบญจ', 'ฉอ', 'ฉ', 'สัปต', 'สัตต', 'อัฐ', 'อัฏฐ', 'นพ', 'นว', 'ทศ'];
+const VALID_SUFFIXES = ['ทวิ', 'ตรี', 'จัตวา', 'เบญจ', 'ฉอ', 'ฉ', 'สัปต', 'สัตต', 'อัฐ', 'อัฏฐ', 'อัฎฐ', 'นพ', 'นว', 'ทศ'];
 const suffixPattern = VALID_SUFFIXES.join('|');
 
 const LAW_PREFIXES = [
@@ -188,16 +191,25 @@ export async function initCategoryCache() {
 }
 
 export function getSectionCategory(lawName: string, sectionNumber: string): string {
-  // First check exact match, e.g. "ประมวลกฎหมายวิธีพิจารณาความแพ่ง:309 ทวิ"
-  const exactKey = `${lawName.trim()}:${sectionNumber.trim()}`;
+  const normLaw = lawName.trim();
+  const cleanSec = sectionNumber.trim();
+  // First check exact match, e.g. "พระราชบัญญัติล้มละลาย:90/42 ทวิ"
+  const exactKey = `${normLaw}:${cleanSec}`;
   if (categoryLookupCache.has(exactKey)) {
     return categoryLookupCache.get(exactKey)!;
   }
 
-  // Extract base number from section (e.g. "14/1" -> "14", "1336" -> "1336", "309 ทวิ" -> "309")
-  const baseSectionMatch = sectionNumber.match(/\d+/);
-  const baseSection = baseSectionMatch ? baseSectionMatch[0] : sectionNumber.trim();
+  // Also check normalized space
+  const normSec = cleanSec.replace(/\s+/g, ' ');
+  const normKey = `${normLaw}:${normSec}`;
+  if (categoryLookupCache.has(normKey)) {
+    return categoryLookupCache.get(normKey)!;
+  }
+
+  // Extract base number from section (e.g. "90/42 ทวิ" -> "90/42", "14/1" -> "14/1", "309 ทวิ" -> "309")
+  const baseSectionMatch = cleanSec.match(/\d+(?:\/\d+)?/);
+  const baseSection = baseSectionMatch ? baseSectionMatch[0] : cleanSec;
   
-  const key = `${lawName.trim()}:${baseSection}`;
-  return categoryLookupCache.get(key) || `${lawName} (มาตราทั่วไป / อื่นๆ)`;
+  const key = `${normLaw}:${baseSection}`;
+  return categoryLookupCache.get(key) || `${normLaw} (มาตราทั่วไป / อื่นๆ)`;
 }

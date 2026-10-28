@@ -14,17 +14,42 @@ export default function LawLinkList({ lawText, books }: { lawText: string, books
   for (const book of books) {
     aliases.push({ alias: book.name, bookId: book.id });
     aliases.push({ alias: book.abbreviation, bookId: book.id });
+
+    // Without spaces (e.g. "พ.ร.บ. ล้มละลาย" -> "พ.ร.บ.ล้มละลาย")
+    const noSpacesAbbr = book.abbreviation.replace(/\s+/g, '');
+    if (noSpacesAbbr !== book.abbreviation) {
+      aliases.push({ alias: noSpacesAbbr, bookId: book.id });
+    }
+    const noSpacesName = book.name.replace(/\s+/g, '');
+    if (noSpacesName !== book.name) {
+      aliases.push({ alias: noSpacesName, bookId: book.id });
+    }
     
-    // Without dots (e.g. ป.อ. -> ปอ)
+    // Without dots (e.g. ป.อ. -> ปอ, พ.ร.บ.ล้มละลาย -> พรบล้มละลาย)
     const noDots = book.abbreviation.replace(/\./g, '');
     if (noDots !== book.abbreviation) {
       aliases.push({ alias: noDots, bookId: book.id });
+      aliases.push({ alias: noDots.replace(/\s+/g, ''), bookId: book.id });
     }
     
     // Missing trailing dot (e.g. ป.อ. -> ป.อ)
     if (book.abbreviation.endsWith('.')) {
       aliases.push({ alias: book.abbreviation.slice(0, -1), bookId: book.id });
     }
+
+    // Variations with ฯ (e.g. พ.ร.บ.ล้มละลายฯ)
+    aliases.push({ alias: `${noSpacesAbbr}ฯ`, bookId: book.id });
+    aliases.push({ alias: `${book.abbreviation}ฯ`, bookId: book.id });
+    aliases.push({ alias: `${book.name}ฯ`, bookId: book.id });
+  }
+
+  // Explicit aliases for Bankruptcy Act
+  const bkBook = books.find(b => b.id === 'bankruptcy');
+  if (bkBook) {
+    aliases.push({ alias: 'พ.ร.บ.ล้มละลาย', bookId: 'bankruptcy' });
+    aliases.push({ alias: 'พ.ร.บ. ล้มละลาย', bookId: 'bankruptcy' });
+    aliases.push({ alias: 'พระราชบัญญัติล้มละลาย', bookId: 'bankruptcy' });
+    aliases.push({ alias: 'พรบล้มละลาย', bookId: 'bankruptcy' });
   }
 
   // Deduplicate and sort by length descending
@@ -61,7 +86,7 @@ export default function LawLinkList({ lawText, books }: { lawText: string, books
           <div key={idx} className="leading-relaxed">
             {parts.map((part, pIdx) => {
               // Extract the number from the part
-              const sectionSuffixes = 'ทวิ|ตรี|จัตวา|เบญจ|ฉ|สัตต|อัฏฐ|นว|ทศ';
+              const sectionSuffixes = 'ทวิ|ตรี|จัตวา|เบญจ|ฉ|สัตต|อัฏฐ|อัฎฐ|นว|ทศ';
               const sectionRegex = new RegExp(`(?:มาตรา|ม\\.)?\\s*([๐-๙0-9]+(?:/[๐-๙0-9]+)?(?:\\s*(?:${sectionSuffixes}))?)`, 'g');
               
               let lastIndex = 0;

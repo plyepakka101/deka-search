@@ -6,7 +6,8 @@ import OfficialDekaSearchButton from "@/components/OfficialDekaSearchButton";
 import PinToSectionButton from "@/components/PinToSectionButton";
 import PopularSearches from "@/components/PopularSearches";
 import BooleanSearchInput from "@/components/BooleanSearchInput";
-import { parseLaws, LAW_MAP, getSectionCategory, initCategoryCache, compareSections } from "@/utils/lawParser";
+import { parseLaws, LAW_MAP, getSectionCategory, initCategoryCache, compareSections, normalizeLawName } from "@/utils/lawParser";
+import { thaiToArabic } from "@/components/law-mate/utils/textUtils";
 import { unstable_cache } from "next/cache";
 
 export const dynamic = "force-dynamic";
@@ -171,7 +172,10 @@ export default async function SearchPage({
       if (!law_name) {
         lawGroups = aggs.lawGroups;
       } else {
-        const rawSections = aggs.lawSections[law_name] || [];
+        const targetLawKey = Object.keys(aggs.lawSections).find(
+          k => normalizeLawName(k) === normalizeLawName(law_name) || k === law_name
+        ) || law_name;
+        const rawSections = aggs.lawSections[targetLawKey] || [];
         const shouldHideFallback = rawSections.length > 1;
         sectionGroupsByCategory = rawSections.filter(group => !(shouldHideFallback && group.category.includes('(มาตราทั่วไป / อื่นๆ)')));
       }
@@ -201,11 +205,12 @@ export default async function SearchPage({
           .sort((a, b) => b._count - a._count);
       } else {
         // Level 2 Dynamic
+        const normLawName = normalizeLawName(law_name);
         const sectionDict: Record<string, number> = {};
         allDecisions.forEach(d => {
           if (!d.law) return;
           const parsed = parseLaws(d.law);
-          const match = parsed.find(p => p.mappedName === law_name);
+          const match = parsed.find(p => normalizeLawName(p.mappedName) === normLawName || normalizeLawName(p.lawName) === normLawName);
           if (match) {
             const seen = new Set<string>();
             match.sections.forEach(s => {
@@ -239,20 +244,27 @@ export default async function SearchPage({
       }
     } else {
       // Level 3: Actual results for this section
-      // First filter DB by CONTAINS section to dramatically reduce JS parsing overhead
+      // First filter DB by CONTAINS base section number to dramatically reduce JS parsing overhead
+      const cleanSection = thaiToArabic(section).trim();
+      const baseNumMatch = cleanSection.match(/\d+(?:\/\d+)?/);
+      const searchNum = baseNumMatch ? baseNumMatch[0] : cleanSection;
+
       const candidateDecisions = await prisma.decision.findMany({
         select: { id: true, law: true },
         where: {
           ...whereClause,
-          law: { contains: section }
+          law: { contains: searchNum }
         }
       });
       
+      const normLawName = normalizeLawName(law_name);
+      const targetSecClean = cleanSection.replace(/\s+/g, '');
+
       const matchingIds = candidateDecisions.filter(d => {
         if (!d.law) return false;
         const parsed = parseLaws(d.law);
-        const match = parsed.find(p => p.mappedName === law_name);
-        return match && match.sections.includes(section);
+        const match = parsed.find(p => normalizeLawName(p.mappedName) === normLawName || normalizeLawName(p.lawName) === normLawName);
+        return match && match.sections.some(s => s.replace(/\s+/g, '') === targetSecClean);
       }).map(d => d.id);
       
       results = await prisma.decision.findMany({

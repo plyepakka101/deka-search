@@ -13,17 +13,42 @@ export function TextWithLawLinks({ text, books }: { text: string, books: LawBook
   for (const book of books) {
     aliases.push({ alias: book.name, bookId: book.id });
     aliases.push({ alias: book.abbreviation, bookId: book.id });
+
+    // Without spaces (e.g. "พ.ร.บ. ล้มละลาย" -> "พ.ร.บ.ล้มละลาย")
+    const noSpacesAbbr = book.abbreviation.replace(/\s+/g, '');
+    if (noSpacesAbbr !== book.abbreviation) {
+      aliases.push({ alias: noSpacesAbbr, bookId: book.id });
+    }
+    const noSpacesName = book.name.replace(/\s+/g, '');
+    if (noSpacesName !== book.name) {
+      aliases.push({ alias: noSpacesName, bookId: book.id });
+    }
     
-    // Without dots (e.g. ป.อ. -> ปอ)
+    // Without dots (e.g. ป.อ. -> ปอ, พ.ร.บ.ล้มละลาย -> พรบล้มละลาย)
     const noDots = book.abbreviation.replace(/\./g, '');
     if (noDots !== book.abbreviation) {
       aliases.push({ alias: noDots, bookId: book.id });
+      aliases.push({ alias: noDots.replace(/\s+/g, ''), bookId: book.id });
     }
     
     // Missing trailing dot (e.g. ป.อ. -> ป.อ)
     if (book.abbreviation.endsWith('.')) {
       aliases.push({ alias: book.abbreviation.slice(0, -1), bookId: book.id });
     }
+
+    // Variations with ฯ (e.g. พ.ร.บ.ล้มละลายฯ)
+    aliases.push({ alias: `${noSpacesAbbr}ฯ`, bookId: book.id });
+    aliases.push({ alias: `${book.abbreviation}ฯ`, bookId: book.id });
+    aliases.push({ alias: `${book.name}ฯ`, bookId: book.id });
+  }
+
+  // Explicit aliases for Bankruptcy Act
+  const bkBook = books.find(b => b.id === 'bankruptcy');
+  if (bkBook) {
+    aliases.push({ alias: 'พ.ร.บ.ล้มละลาย', bookId: 'bankruptcy' });
+    aliases.push({ alias: 'พ.ร.บ. ล้มละลาย', bookId: 'bankruptcy' });
+    aliases.push({ alias: 'พระราชบัญญัติล้มละลาย', bookId: 'bankruptcy' });
+    aliases.push({ alias: 'พรบล้มละลาย', bookId: 'bankruptcy' });
   }
 
   // Deduplicate and sort
@@ -33,17 +58,17 @@ export function TextWithLawLinks({ text, books }: { text: string, books: LawBook
   // Build regex: (alias1|alias2|...) (มาตรา|ม.) (numbers with optional suffixes like /1 or ทวิ)
   const escapedAliases = uniqueAliases.map(a => a.alias.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')).join('|');
   
-  // Regex parts:
-  // 1: The law alias
-  // 2: Optional space
-  // 3: "มาตรา" or "ม." with optional space
-  // 4: Section numbers (comma separated or "และ" or just single number) 
-  // Actually parsing comma-separated sections inside regex is hard.
-  // Instead, let's just match the start (law alias + มาตรา + first number), and we can process comma separated later,
-  // but for TextWithLawLinks which is inline text, usually it's "ป.อ. มาตรา 193"
-  // Let's use a robust regex for a single section match.
-  const sectionSuffixes = 'ทวิ|ตรี|จัตวา|เบญจ|ฉ|สัตต|อัฏฐ|นว|ทศ';
-  const baseRegex = new RegExp(`(${escapedAliases})\\s*(?:มาตรา|ม\\.)\\s*([๐-๙0-9]+(?:/[๐-๙0-9]+)?(?:\\s*(?:${sectionSuffixes}))?)`, 'g');
+  // Section suffixes including อัฏฐ and อัฎฐ
+  const sectionSuffixes = 'ทวิ|ตรี|จัตวา|เบญจ|ฉ|สัตต|อัฏฐ|อัฎฐ|นว|ทศ';
+
+  // Base regex matches:
+  // 1) Law name + optional (ฯ / พ.ศ. 2483 / พุทธศักราช ๒๔๘๓) + มาตรา/ม. + Section number
+  // 2) Standalone Bankruptcy Section 90/... (e.g. "มาตรา 90/42 ทวิ") which only exists in Bankruptcy Act
+  const baseRegex = new RegExp(
+    `(?:(${escapedAliases})(?:\\s*ฯ)?(?:\\s*(?:พ\\.ศ\\.|พุทธศักราช)?\\s*[๐-๙0-9]{4})?\\s*(?:มาตรา|ม\\.)\\s*([๐-๙0-9]+(?:/[๐-๙0-9]+)?(?:\\s*(?:${sectionSuffixes}))?))|` +
+    `(?:(?<![ก-๙a-zA-Z0-9])(?:มาตรา|ม\\.)\\s*(90/[๐-๙0-9]+(?:\\s*(?:${sectionSuffixes}))?))`,
+    'g'
+  );
 
   const parts = [];
   let lastIndex = 0;
@@ -55,14 +80,15 @@ export function TextWithLawLinks({ text, books }: { text: string, books: LawBook
     }
 
     const matchedAlias = match[1];
-    const firstSectionNum = match[2].trim();
-    const book = uniqueAliases.find(a => a.alias === matchedAlias);
+    const firstSectionNum = match[2] ? match[2].trim() : (match[3] ? match[3].trim() : '');
+    const book = matchedAlias ? uniqueAliases.find(a => a.alias === matchedAlias) : null;
+    const targetBookId = book ? book.bookId : (bkBook ? bkBook.id : 'bankruptcy');
 
-    if (book) {
+    if ((book || bkBook) && firstSectionNum) {
       parts.push(
         <LawHoverCard
           key={`link-${match.index}`}
-          bookId={book.bookId}
+          bookId={targetBookId}
           sectionNum={firstSectionNum}
           matchText={match[0]}
         />
@@ -74,7 +100,6 @@ export function TextWithLawLinks({ text, books }: { text: string, books: LawBook
       let subMatch;
       while ((subMatch = subsequentRegex.exec(text.substring(currentIdx))) !== null) {
         // Skip if it looks like a year (e.g., 2565) and not explicitly marked with "มาตรา"
-        // Since we are parsing just numbers after a comma, 4 digit numbers starting with 24/25 are highly likely years
         if (/^(24|25|๒๔|๒๕)[0-9๐-๙]{2}$/.test(subMatch[1].trim())) {
           break; // Stop parsing subsequent numbers if we hit a year
         }
@@ -86,7 +111,7 @@ export function TextWithLawLinks({ text, books }: { text: string, books: LawBook
         parts.push(
           <LawHoverCard
             key={`link-sub-${currentIdx}`}
-            bookId={book.bookId}
+            bookId={targetBookId}
             sectionNum={nextSectionNum}
             matchText={nextSectionNum}
           />

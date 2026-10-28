@@ -190,7 +190,7 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
       if (!lawName && law.category) {
           lawName = law.category.split(' > ')[0];
       }
-      const cleanSection = thaiToArabic(law.sectionNumber).trim().replace(/\s+/g, '');
+      const cleanSection = thaiToArabic(law.sectionNumber).trim().replace(/\s+/g, ' ');
       window.location.href = `/search?tab=law&law_name=${encodeURIComponent(lawName)}&section=${encodeURIComponent(cleanSection)}`;
   }
 
