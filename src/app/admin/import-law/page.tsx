@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Upload, FileText, ChevronLeft, Check, AlertCircle } from 'lucide-react';
+import { Upload, FileText, ChevronLeft, Check, AlertCircle, ArrowRight } from 'lucide-react';
+import { clearLawsCache } from '@/components/law-mate/services/dataService';
 
 export default function ImportLawPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -66,8 +67,15 @@ export default function ImportLawPage() {
         throw new Error(data.error || 'Failed to import law');
       }
 
+      // Invalidate local client-side IndexedDB cache immediately
+      try {
+        await clearLawsCache();
+      } catch (err) {
+        console.error('Failed to clear laws cache', err);
+      }
+
       setStatus('success');
-      setMessage('นำเข้ากฎหมายสำเร็จ');
+      setMessage('นำเข้ากฎหมายสำเร็จ พร้อมอัปเดตระบบเรียบร้อยแล้ว');
       setFile(null);
       setName('');
       setAbbreviation('');
@@ -98,12 +106,21 @@ export default function ImportLawPage() {
 
       <main className="max-w-3xl mx-auto px-4 py-8">
         {status === 'success' && (
-          <div className="mb-6 p-4 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-200 flex items-start gap-3">
-            <Check className="w-5 h-5 mt-0.5 flex-shrink-0" />
-            <div>
-              <div className="font-medium">สำเร็จ</div>
-              <div className="text-sm opacity-90">{message}</div>
+          <div className="mb-6 p-4 bg-emerald-50 text-emerald-800 rounded-xl border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <Check className="w-5 h-5 mt-0.5 text-emerald-600 flex-shrink-0" />
+              <div>
+                <div className="font-semibold text-emerald-900">สำเร็จ</div>
+                <div className="text-sm opacity-90">{message}</div>
+              </div>
             </div>
+            <Link 
+              href="/laws"
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-xs shrink-0"
+            >
+              <span>ไปที่หน้าตัวบทกฎหมาย</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
         )}
 

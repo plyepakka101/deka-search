@@ -5,6 +5,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const includeContent = searchParams.get('includeContent') === 'true';
+    const noCache = searchParams.get('nocache') === 'true' || searchParams.has('_t');
 
     const books = await prisma.lawBook.findMany({
       orderBy: { createdAt: 'asc' },
@@ -16,13 +17,16 @@ export async function GET(request: Request) {
         description: true,
         sourceUrl: true,
         lastUpdated: true,
+        createdAt: true,
+        updatedAt: true,
         content: includeContent,
       }
     });
 
-    const cacheHeader = includeContent
-      ? 'public, max-age=600, stale-while-revalidate=86400'
-      : 'public, max-age=1800, stale-while-revalidate=86400';
+    let cacheHeader = 'no-cache, no-store, must-revalidate';
+    if (includeContent && !noCache) {
+      cacheHeader = 'public, max-age=60, stale-while-revalidate=300';
+    }
 
     return NextResponse.json(books, {
       headers: {

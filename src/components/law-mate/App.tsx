@@ -19,24 +19,32 @@ const App: React.FC = () => {
   const [activeBookId, setActiveBookId] = useState<string | null>(null);
   
   const [laws, setLaws] = useState<LawSection[]>([]);
+  const [books, setBooks] = useState<LawBook[]>(getBooks());
   const [notes, setNotes] = useState<Record<string, UserNote>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [settings, setSettings] = useState<AppSettings>({ darkMode: false, fontSize: 2, fontStyle: 'modern' });
   const [isLoading, setIsLoading] = useState(true);
   
-  const books = getBooks();
   const activeBook = useMemo(() => books.find(b => b.id === activeBookId), [activeBookId, books]);
 
-  // Initial Data Load
+  // Initial Data Load & SWR updates
   useEffect(() => {
-    initLawsData().then(async () => {
-       setLaws(getLaws());
+    const updateData = () => {
+      setBooks([...getBooks()]);
+      setLaws(getLaws());
+    };
+
+    initLawsData(false, updateData).then(async () => {
+       updateData();
        await syncAdminImportantSections();
        setNotes(getNotes());
        const savedSettings = getSettings();
        setSettings(savedSettings);
        setIsLoading(false);
     });
+
+    window.addEventListener('laws-data-updated', updateData);
+    return () => window.removeEventListener('laws-data-updated', updateData);
   }, []);
 
   // Parse deep link for sharing

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { revalidatePath } from 'next/cache';
 
 export async function POST(request: Request) {
   try {
@@ -31,6 +32,10 @@ export async function POST(request: Request) {
         lastUpdated: new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' }),
       }
     });
+
+    revalidatePath('/api/laws/books');
+    revalidatePath('/laws');
+    revalidatePath('/search/law');
 
     return NextResponse.json({ success: true, book: newBook });
   } catch (error) {

@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { LawBook, LawSection } from '../types';
-import { Book, ChevronRight, Library, Brain } from 'lucide-react';
+import { Book, ChevronRight, Library, Brain, RotateCw } from 'lucide-react';
 import { getLocalItems } from '../services/memorizeService';
+import { initLawsData } from '../services/dataService';
 
 interface BookshelfProps {
   books: LawBook[];
@@ -12,6 +13,16 @@ interface BookshelfProps {
 
 export const Bookshelf: React.FC<BookshelfProps> = ({ books, laws, onSelectBook }) => {
   const memoItems = getLocalItems();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await initLawsData(true);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
   
   const getLawCount = (bookId: string) => {
     return laws.filter(l => l.bookId === bookId).length;
@@ -23,10 +34,19 @@ export const Bookshelf: React.FC<BookshelfProps> = ({ books, laws, onSelectBook 
 
   return (
     <div className="max-w-4xl mx-auto pb-12 animate-in fade-in zoom-in duration-300">
-      <div className="flex items-center justify-center mb-8 md:mb-12">
-         <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 mb-2">
+      <div className="flex flex-col items-center justify-center mb-6 md:mb-10">
+         <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 mb-3">
             <Library size={44} className="text-indigo-600 dark:text-indigo-400" />
          </div>
+         <button
+           onClick={handleRefresh}
+           disabled={isRefreshing}
+           className="inline-flex items-center gap-1.5 px-3 py-1 text-xs text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 bg-white dark:bg-slate-900 rounded-full border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:border-indigo-300 transition-all cursor-pointer disabled:opacity-50"
+           title="ซิงค์และตรวจสอบกฎหมายใหม่จากฐานข้อมูล"
+         >
+           <RotateCw size={12} className={isRefreshing ? "animate-spin text-indigo-600" : ""} />
+           <span>{isRefreshing ? "กำลังซิงค์ข้อมูล..." : "ซิงค์ตัวบทล่าสุด"}</span>
+         </button>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-5 px-2">
