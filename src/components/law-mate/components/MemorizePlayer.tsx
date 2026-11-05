@@ -13,7 +13,7 @@ import { getSettings, getLaws } from '../services/dataService';
 import { thaiToArabic } from '../utils/textUtils';
 import {
   DEFAULT_AZURE_VOICE,
-  getAzureAudioUrl,
+  getAudioUrl,
   isAzureUnavailable,
   pickBrowserVoice,
   playAudioUrl,
@@ -230,12 +230,16 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
     window.speechSynthesis.speak(utterance);
   };
 
-  // Azure Neural voice first; falls back to the browser voice on any failure
+  // Plays TTS according to user's selected provider (azure, edge, google, or browser)
   const playSingleTTS = (textToSpeak: string, onEndCallback?: () => void) => {
     const currentSettings = settings || getSettings();
     const provider = currentSettings.ttsProvider ?? 'azure';
 
-    if (provider !== 'azure' || isAzureUnavailable() || typeof window === 'undefined') {
+    if (
+      provider === 'browser' ||
+      (provider === 'azure' && isAzureUnavailable()) ||
+      typeof window === 'undefined'
+    ) {
       playBrowserTTS(textToSpeak, onEndCallback);
       return;
     }
@@ -249,24 +253,29 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
     unlockAudio(el); // must run synchronously inside the user's click
     setSpeaking(true);
 
-    getAzureAudioUrl(textToSpeak, currentSettings.azureVoice || DEFAULT_AZURE_VOICE, voiceRate)
+    getAudioUrl(textToSpeak, currentSettings.azureVoice || DEFAULT_AZURE_VOICE, voiceRate, provider)
       .then(url => {
         if (token !== playTokenRef.current) return;
-        return playAudioUrl(el, url, {
-          onEnded: () => {
-            if (token !== playTokenRef.current) return;
-            setSpeaking(false);
-            if (onEndCallback) onEndCallback();
+        return playAudioUrl(
+          el,
+          url,
+          {
+            onEnded: () => {
+              if (token !== playTokenRef.current) return;
+              setSpeaking(false);
+              if (onEndCallback) onEndCallback();
+            },
+            onError: () => {
+              if (token !== playTokenRef.current) return;
+              playBrowserTTS(textToSpeak, onEndCallback);
+            },
           },
-          onError: () => {
-            if (token !== playTokenRef.current) return;
-            playBrowserTTS(textToSpeak, onEndCallback);
-          },
-        });
+          voiceRate
+        );
       })
       .catch(err => {
         if (token !== playTokenRef.current) return;
-        console.warn('Azure TTS failed, using browser voice:', err);
+        console.warn(`${provider} TTS failed, using browser voice:`, err);
         playBrowserTTS(textToSpeak, onEndCallback);
       });
   };

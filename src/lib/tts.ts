@@ -1,7 +1,8 @@
-// Client-side helpers for Text-to-Speech: Azure Neural voices (via /api/tts)
-// with a browser speechSynthesis fallback.
+// Client-side helpers for Text-to-Speech: Azure Neural, Edge-TTS, Google Cloud TTS
+// and browser speechSynthesis fallback.
+import { TtsProvider } from '@/components/law-mate/types';
 
-export type TtsProvider = 'azure' | 'browser';
+export type { TtsProvider };
 
 export const AZURE_THAI_VOICES = [
   { id: 'th-TH-PremwadeeNeural', label: 'Premwadee (หญิง)' },
@@ -38,10 +39,10 @@ export function pickBrowserVoice(
 }
 
 // ---------------------------------------------------------------------------
-// Azure audio: memory + Cache Storage so loops and repeat reviews don't re-bill.
+// Audio cache: memory + Cache Storage so loops and repeat reviews don't re-fetch.
 // ---------------------------------------------------------------------------
-const CACHE_NAME = 'deka-tts-v1';
-const MEMORY_LIMIT = 40;
+const CACHE_NAME = 'deka-tts-v2';
+const MEMORY_LIMIT = 50;
 const memoryCache = new Map<string, string>(); // key -> object URL
 
 let azureUnavailable = false;
@@ -70,8 +71,13 @@ function rememberInMemory(key: string, url: string) {
   }
 }
 
-export async function getAzureAudioUrl(text: string, voice: string, rate: number): Promise<string> {
-  const key = await sha256Hex(`${voice}|${rate}|${text}`);
+export async function getAudioUrl(
+  text: string,
+  voice: string,
+  rate: number,
+  provider: TtsProvider = 'azure'
+): Promise<string> {
+  const key = await sha256Hex(`${provider}|${voice}|${rate}|${text}`);
 
   const inMemory = memoryCache.get(key);
   if (inMemory) return inMemory;
@@ -95,12 +101,14 @@ export async function getAzureAudioUrl(text: string, voice: string, rate: number
   const res = await fetch('/api/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, voice, rate }),
+    body: JSON.stringify({ text, voice, rate, provider }),
   });
 
   if (!res.ok) {
-    // Not signed in / not configured: stop trying for this page session.
-    if (res.status === 401 || res.status === 503) azureUnavailable = true;
+    // If Azure credentials missing or unauthorized, mark as unavailable for this session
+    if (res.status === 401 || res.status === 503) {
+      if (provider === 'azure') azureUnavailable = true;
+    }
     throw new Error(`TTS request failed (${res.status})`);
   }
 
@@ -114,6 +122,9 @@ export async function getAzureAudioUrl(text: string, voice: string, rate: number
   rememberInMemory(key, url);
   return url;
 }
+
+// Backward compatibility alias
+export const getAzureAudioUrl = getAudioUrl;
 
 // ---------------------------------------------------------------------------
 // Mobile Safari only allows audio.play() on an element that was started inside
@@ -142,10 +153,14 @@ export function resetAudio(el: HTMLAudioElement | null | undefined) {
 export function playAudioUrl(
   el: HTMLAudioElement,
   url: string,
-  handlers: { onEnded: () => void; onError: () => void }
+  handlers: { onEnded: () => void; onError: () => void },
+  playbackRate = 1.0
 ): Promise<void> {
   el.onended = handlers.onEnded;
   el.onerror = handlers.onError;
   el.src = url;
+  if (Number.isFinite(playbackRate) && playbackRate > 0) {
+    el.playbackRate = playbackRate;
+  }
   return el.play();
 }

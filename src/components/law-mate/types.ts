@@ -123,6 +123,8 @@ export interface ExportOptions {
 
 export type FontStyle = 'modern' | 'traditional';
 
+export type TtsProvider = 'azure' | 'edge' | 'google' | 'browser';
+
 export interface AppSettings {
   darkMode: boolean;
   fontSize: number; // 1-5
@@ -130,7 +132,7 @@ export interface AppSettings {
   lineHeight?: number; // 1.5, 1.8, 2.0
   voiceURI?: string;
   speakingRate?: number;
-  ttsProvider?: 'azure' | 'browser'; // default: 'azure' (falls back to browser voice)
+  ttsProvider?: TtsProvider; // default: 'azure'
   azureVoice?: string; // e.g. 'th-TH-PremwadeeNeural'
 }
 

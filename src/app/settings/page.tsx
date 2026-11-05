@@ -40,11 +40,11 @@ import {
   DEFAULT_EXPORT_OPTIONS,
   ImportSummary,
 } from "@/components/law-mate/services/dataService";
-import { AppSettings, ExportOptions } from "@/components/law-mate/types";
+import { AppSettings, ExportOptions, TtsProvider } from "@/components/law-mate/types";
 import {
   AZURE_THAI_VOICES,
   DEFAULT_AZURE_VOICE,
-  getAzureAudioUrl,
+  getAudioUrl,
   isAzureUnavailable,
   pickBrowserVoice,
   unlockAudio,
@@ -232,7 +232,7 @@ export default function SettingsPage() {
 
   const handleTestVoice = () => {
     const provider = settings.ttsProvider ?? "azure";
-    if (provider !== "azure" || isAzureUnavailable()) {
+    if (provider === "browser" || (provider === "azure" && isAzureUnavailable())) {
       testBrowserVoice();
       return;
     }
@@ -242,7 +242,7 @@ export default function SettingsPage() {
     unlockAudio(audio); // keep the click gesture for mobile Safari
     setIsPlayingTestVoice(true);
 
-    getAzureAudioUrl(testText, settings.azureVoice || DEFAULT_AZURE_VOICE, settings.speakingRate || 1.0)
+    getAudioUrl(testText, settings.azureVoice || DEFAULT_AZURE_VOICE, settings.speakingRate || 1.0, provider)
       .then(url => {
         audio.onended = () => setIsPlayingTestVoice(false);
         audio.onerror = () => {
@@ -250,12 +250,13 @@ export default function SettingsPage() {
           testBrowserVoice();
         };
         audio.src = url;
+        audio.playbackRate = settings.speakingRate || 1.0;
         return audio.play();
       })
       .catch(err => {
-        console.warn("Azure TTS test failed, using browser voice:", err);
+        console.warn(`${provider} TTS test failed, using browser voice:`, err);
         setIsPlayingTestVoice(false);
-        showToast("เสียงคุณภาพสูงใช้ไม่ได้ (ต้องเข้าสู่ระบบ/ตั้งค่า Azure) ใช้เสียงของเบราว์เซอร์แทน");
+        showToast("เสียงจากเซิร์ฟเวอร์ขัดข้อง ใช้เสียงของเบราว์เซอร์แทน");
         testBrowserVoice();
       });
   };
@@ -550,22 +551,24 @@ export default function SettingsPage() {
               </label>
               <select
                 value={settings.ttsProvider ?? "azure"}
-                onChange={(e) => updateSetting("ttsProvider", e.target.value as "azure" | "browser")}
+                onChange={(e) => updateSetting("ttsProvider", e.target.value as TtsProvider)}
                 className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
               >
-                <option value="azure">เสียงคุณภาพสูง (Azure Neural) — ต้องเข้าสู่ระบบ</option>
-                <option value="browser">เสียงของเบราว์เซอร์ (ฟรี ทำงานออฟไลน์ได้)</option>
+                <option value="azure">เสียงคุณภาพสูง (Azure Neural) — คมชัดสูงสุด ต้องเข้าสู่ระบบ</option>
+                <option value="edge">เสียง Edge-TTS (Premwadee / Niwat) — ฟรีผ่านเซิร์ฟเวอร์</option>
+                <option value="google">เสียง Google Cloud TTS — ฟรี ไม่จำกัด ไม่ต้องใช้คีย์</option>
+                <option value="browser">เสียงของเบราว์เซอร์ — ฟรี 100% ทำงานออฟไลน์ (ใน Edge เป็นเสียงธรรมชาติ)</option>
               </select>
               <p className="text-xs text-slate-400">
-                * ถ้าเสียงคุณภาพสูงใช้ไม่ได้ ระบบจะสลับไปใช้เสียงของเบราว์เซอร์ให้อัตโนมัติ
+                * หากแหล่งเสียงที่เลือกเกิดขัดข้อง ระบบจะสลับไปใช้เสียงสำรองให้อัตโนมัติอย่างราบรื่น
               </p>
             </div>
 
-            {/* Azure Voice Selection */}
-            {(settings.ttsProvider ?? "azure") === "azure" && (
+            {/* Azure / Edge Neural Voice Selection */}
+            {((settings.ttsProvider ?? "azure") === "azure" || settings.ttsProvider === "edge") && (
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                  เลือกเสียง Azure
+                  เลือกเสียงพากย์ (Neural Voice)
                 </label>
                 <select
                   value={settings.azureVoice || DEFAULT_AZURE_VOICE}
