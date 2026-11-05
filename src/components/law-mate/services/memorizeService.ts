@@ -418,6 +418,34 @@ export async function addSectionToDeck(deckId: string, sectionId: string, title?
 }
 
 /**
+ * Mark a section as remembered (จำได้ - Mastered) or unremembered (จำไม่ได้ - Need review) directly
+ */
+export async function markSectionMastery(
+  sectionId: string,
+  bookId?: string,
+  remembered: boolean = true,
+  title?: string
+): Promise<MemorizationItem | undefined> {
+  const targetDeckId = `deck-${bookId || 'crim'}`;
+  let localItems = readJson<MemorizationItem[]>(MEMO_ITEMS_KEY, []);
+  let item = localItems.find(i => i.sectionId === sectionId);
+
+  if (!item) {
+    // Automatically add to deck first
+    await addSectionToDeck(targetDeckId, sectionId, title);
+    localItems = readJson<MemorizationItem[]>(MEMO_ITEMS_KEY, []);
+    item = localItems.find(i => i.sectionId === sectionId);
+  }
+
+  if (item) {
+    // Quality 3 for remembered (Good), Quality 1 for unremembered (Again/Weak)
+    const updated = await recordReview(item.id, remembered ? 3 : 1, 'recall');
+    return updated;
+  }
+  return undefined;
+}
+
+/**
  * Remove an item from memorization
  */
 export async function removeItem(itemId: string): Promise<boolean> {

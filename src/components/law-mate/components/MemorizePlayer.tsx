@@ -100,8 +100,50 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
   // Cloze state
   const [userAnswers, setUserAnswers] = useState<Record<number, string>>({});
 
-  const currentItem = items[currentIndex];
-  const total = items.length;
+  // Session items state for immediate live feedback during study session
+  const [sessionItems, setSessionItems] = useState<MemorizationItem[]>(items);
+  useEffect(() => {
+    setSessionItems(items);
+  }, [items]);
+
+  // Focus Mode Filter ('all' | 'need_review' | 'mastered')
+  const [filterMode, setFilterMode] = useState<'all' | 'need_review' | 'mastered'>('all');
+
+  const isNeedReview = useCallback((item: MemorizationItem) => {
+    return (
+      item.status === 'learning' ||
+      item.lastQuality === 1 ||
+      item.lastQuality === 2 ||
+      (item.status === 'new' && (item.lastQuality === undefined || item.lastQuality === null))
+    );
+  }, []);
+
+  const isMastered = useCallback((item: MemorizationItem) => {
+    return (
+      item.status === 'mastered' ||
+      (typeof item.lastQuality === 'number' && item.lastQuality >= 3)
+    );
+  }, []);
+
+  const filteredItems = React.useMemo(() => {
+    if (filterMode === 'need_review') return sessionItems.filter(isNeedReview);
+    if (filterMode === 'mastered') return sessionItems.filter(isMastered);
+    return sessionItems;
+  }, [sessionItems, filterMode, isNeedReview, isMastered]);
+
+  const needReviewCount = sessionItems.filter(isNeedReview).length;
+  const masteredCount = sessionItems.filter(isMastered).length;
+
+  const total = filteredItems.length;
+  const safeIndex = total === 0 ? 0 : Math.min(currentIndex, total - 1);
+  const currentItem = filteredItems[safeIndex];
+
+  const handleSelectFilterMode = (newMode: 'all' | 'need_review' | 'mastered') => {
+    if (newMode === filterMode) return;
+    stopTTS();
+    setFilterMode(newMode);
+    setCurrentIndex(0);
+  };
 
   // Split paragraphs and fallback to getLaws() if currentItem.content is missing
   const allLaws = getLaws();
@@ -152,7 +194,7 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
     setUserAnswers({});
     setSelectedParagraphIdx(0);
     stopTTS();
-  }, [currentIndex, stopTTS]);
+  }, [safeIndex, filterMode, stopTTS]);
 
   useEffect(() => {
     // Reset reveal and answers when user switches paragraph
@@ -168,20 +210,49 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
     };
   }, [stopTTS]);
 
-  if (!currentItem) {
+  if (total === 0 || !currentItem) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 text-center max-w-lg mx-auto shadow-sm">
-        <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4">
-          <Award size={36} />
+      <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 text-center max-w-lg mx-auto shadow-sm border border-gray-100 dark:border-gray-750 space-y-4 animate-in fade-in duration-200">
+        <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto text-2xl font-black">
+          {filterMode === 'need_review' ? '🎉' : filterMode === 'mastered' ? '📖' : <Award size={36} />}
         </div>
-        <h3 className="text-xl font-bold mb-2">ทบทวนครบตามเป้าหมายแล้ว! 🎉</h3>
-        <p className="text-gray-500 text-sm mb-6">คุณได้ทบทวนมาตราในชุดนี้ครบถ้วนแล้ว ระบบได้คำนวณรอบทบทวนถัดไปให้เรียบร้อย</p>
-        <button
-          onClick={onFinish}
-          className="w-full py-3 bg-law-600 hover:bg-law-700 text-white font-semibold rounded-xl transition"
-        >
-          กลับสู่ศูนย์การท่องจำ
-        </button>
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+          {filterMode === 'need_review'
+            ? 'ยอดเยี่ยมมาก! ไม่มีมาตราที่ยังจำไม่ได้ในชุดนี้แล้ว'
+            : filterMode === 'mastered'
+            ? 'ยังไม่มีมาตราที่บันทึกว่าจำได้แล้ว'
+            : 'ทบทวนครบตามเป้าหมายแล้ว! 🎉'}
+        </h3>
+        <p className="text-gray-500 text-sm">
+          {filterMode === 'need_review'
+            ? 'คุณจำมาตราในชุดนี้ได้ทั้งหมดแล้ว สามารถสลับกลับไปดูทุกมาตรา หรือทดสอบทบทวนซ้ำได้ตลอดเวลา'
+            : filterMode === 'mastered'
+            ? 'เริ่มทดสอบและกดปุ่ม "จำได้" เพื่อย้ายมาตรามายังกลุ่มนี้'
+            : 'คุณได้ทบทวนมาตราในชุดนี้ครบถ้วนแล้ว ระบบได้คำนวณรอบทบทวนถัดไปให้เรียบร้อย'}
+        </p>
+        <div className="flex flex-col sm:flex-row gap-2 pt-2">
+          {filterMode !== 'all' ? (
+            <button
+              onClick={() => handleSelectFilterMode('all')}
+              className="flex-1 py-3 px-4 bg-law-600 hover:bg-law-700 text-white font-semibold rounded-xl transition cursor-pointer"
+            >
+              ดูมาตราทั้งหมด ({sessionItems.length})
+            </button>
+          ) : (
+            <button
+              onClick={onFinish}
+              className="flex-1 py-3 px-4 bg-law-600 hover:bg-law-700 text-white font-semibold rounded-xl transition cursor-pointer"
+            >
+              กลับสู่ศูนย์การท่องจำ
+            </button>
+          )}
+          <button
+            onClick={onBack}
+            className="py-3 px-4 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl transition cursor-pointer"
+          >
+            ออกจากการท่อง
+          </button>
+        </div>
       </div>
     );
   }
@@ -322,7 +393,7 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
       }, 350);
       return () => clearTimeout(timer);
     }
-  }, [currentIndex, autoAnnounceSection]);
+  }, [safeIndex, filterMode, autoAnnounceSection]);
 
   // -------------------------------------------------------------------
   // Helpers to construct speech text that always includes Section Number AND Content
@@ -486,10 +557,14 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
   // Submit rating and advance
   // -------------------------------------------------------------------
   const handleRating = async (rating: ReviewRating) => {
+    if (!currentItem) return;
     stopTTS();
-    await recordReview(currentItem.id, rating, mode);
-    if (currentIndex + 1 < total) {
-      setCurrentIndex(prev => prev + 1);
+    const updated = await recordReview(currentItem.id, rating, mode);
+    if (updated) {
+      setSessionItems(prev => prev.map(i => (i.id === updated.id ? updated : i)));
+    }
+    if (safeIndex + 1 < total) {
+      setCurrentIndex(safeIndex + 1);
     } else {
       onFinish();
     }
@@ -497,7 +572,7 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
 
   // Browse articles without submitting a review.
   const goToItem = (nextIndex: number) => {
-    if (nextIndex < 0 || nextIndex >= total || nextIndex === currentIndex) return;
+    if (nextIndex < 0 || nextIndex >= total || nextIndex === safeIndex) return;
     stopTTS();
     setCurrentIndex(nextIndex);
   };
@@ -513,7 +588,7 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
       <div className="flex items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
         <button
           onClick={() => { stopTTS(); onBack(); }}
-          className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-law-600 transition"
+          className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-law-600 transition cursor-pointer"
         >
           <ArrowLeft size={18} />
           <span>ออกจากการท่อง</span>
@@ -523,7 +598,7 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
             {deckTitle || 'ชุดท่องจำกฎหมาย'}
           </div>
           <div className="text-sm font-bold text-gray-800 dark:text-gray-200">
-            รายการ {currentIndex + 1} / {total}
+            รายการ {safeIndex + 1} / {total}
           </div>
         </div>
         <div className="flex items-center gap-1.5">
@@ -533,33 +608,104 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
           </div>
           <button
             type="button"
-            onClick={() => goToItem(currentIndex - 1)}
-            disabled={currentIndex === 0}
+            onClick={() => goToItem(safeIndex - 1)}
+            disabled={safeIndex === 0}
             aria-label="ไปมาตราก่อนหน้า"
             title="มาตราก่อนหน้า"
-            className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition"
+            className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
           >
             <ChevronLeft size={18} />
           </button>
           <button
             type="button"
-            onClick={() => goToItem(currentIndex + 1)}
-            disabled={currentIndex === total - 1}
+            onClick={() => goToItem(safeIndex + 1)}
+            disabled={safeIndex === total - 1}
             aria-label="ไปมาตราถัดไป"
             title="มาตราถัดไป"
-            className="p-2 rounded-lg border border-law-200 dark:border-law-800 text-law-600 dark:text-law-300 hover:bg-law-50 dark:hover:bg-law-900/40 disabled:opacity-30 disabled:cursor-not-allowed transition"
+            className="p-2 rounded-lg border border-law-200 dark:border-law-800 text-law-600 dark:text-law-300 hover:bg-law-50 dark:hover:bg-law-900/40 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
           >
             <ChevronRight size={18} />
           </button>
         </div>
       </div>
 
+      {/* Focus Mode Filter Pills (Juris-Voice Focus Mode) */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 bg-white dark:bg-gray-800 p-2.5 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-2xs text-xs">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+          <span className="text-gray-400 font-semibold px-1 shrink-0">โหมดโฟกัส:</span>
+          <button
+            type="button"
+            onClick={() => handleSelectFilterMode('all')}
+            className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+              filterMode === 'all'
+                ? 'bg-law-600 text-white shadow-xs'
+                : 'bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <span>ทั้งหมด</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${filterMode === 'all' ? 'bg-white/20 text-white' : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200'}`}>
+              {sessionItems.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSelectFilterMode('need_review')}
+            className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+              filterMode === 'need_review'
+                ? 'bg-rose-600 text-white shadow-xs'
+                : 'bg-rose-50/70 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60 hover:bg-rose-100/60'
+            }`}
+          >
+            <span>🔴 ยังจำไม่ได้</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${filterMode === 'need_review' ? 'bg-white/20 text-white' : 'bg-rose-200 dark:bg-rose-900/70 text-rose-800 dark:text-rose-200'}`}>
+              {needReviewCount}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSelectFilterMode('mastered')}
+            className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+              filterMode === 'mastered'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/60 hover:bg-emerald-100/60'
+            }`}
+          >
+            <span>🟢 จำได้แล้ว</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${filterMode === 'mastered' ? 'bg-white/20 text-white' : 'bg-emerald-200 dark:bg-emerald-900/70 text-emerald-800 dark:text-emerald-200'}`}>
+              {masteredCount}
+            </span>
+          </button>
+        </div>
+
+        {/* Quick Rapid Action Buttons in Header */}
+        <div className="flex items-center gap-1.5 shrink-0 pt-1 sm:pt-0 sm:pl-2 sm:border-l border-gray-100 dark:border-gray-700 justify-end">
+          <button
+            type="button"
+            onClick={() => handleRating(1)}
+            className="flex-1 sm:flex-none px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 dark:text-rose-300 border border-rose-300 dark:border-rose-800 font-bold text-xs transition active:scale-95 cursor-pointer flex items-center justify-center gap-1"
+            title="จำไม่ได้ - นำมาทบทวนซ้ำ"
+          >
+            <span>🔴 จำไม่ได้</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleRating(3)}
+            className="flex-1 sm:flex-none px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 font-bold text-xs transition active:scale-95 cursor-pointer flex items-center justify-center gap-1"
+            title="จำได้ - บันทึกว่าจำได้แล้ว"
+          >
+            <span>🟢 จำได้</span>
+          </button>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between gap-3 px-1 text-xs">
-        <button type="button" onClick={() => goToItem(currentIndex - 1)} disabled={currentIndex === 0} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition">
+        <button type="button" onClick={() => goToItem(safeIndex - 1)} disabled={safeIndex === 0} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer">
           <ChevronLeft size={15} /> มาตราก่อนหน้า
         </button>
         <span className="text-gray-400 truncate">มาตรา {currentItem.sectionNumber}</span>
-        <button type="button" onClick={() => goToItem(currentIndex + 1)} disabled={currentIndex === total - 1} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-law-600 dark:text-law-300 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition">
+        <button type="button" onClick={() => goToItem(safeIndex + 1)} disabled={safeIndex === total - 1} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-law-600 dark:text-law-300 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer">
           มาตราถัดไป <ChevronRight size={15} />
         </button>
       </div>
@@ -568,7 +714,7 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
       <div className="w-full bg-gray-200 dark:bg-gray-700 h-1.5 rounded-full overflow-hidden">
         <div
           className="bg-law-600 h-full transition-all duration-300 rounded-full"
-          style={{ width: `${((currentIndex + 1) / total) * 100}%` }}
+          style={{ width: `${((safeIndex + 1) / total) * 100}%` }}
         />
       </div>
 
@@ -634,10 +780,20 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
         {/* Card Header */}
         <div className="p-5 border-b border-gray-100 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-750 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-semibold px-2.5 py-0.5 rounded bg-law-100 dark:bg-law-900/50 text-law-700 dark:text-law-300">
                 มาตรา {getSectionNumber(currentItem) || currentItem.sectionNumber}
               </span>
+              {isMastered(currentItem) ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                  <span>🟢 จำได้แล้ว</span>
+                  {currentItem.streak ? <span className="opacity-75">({currentItem.streak})</span> : null}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-800">
+                  <span>🔴 ยังจำไม่ได้</span>
+                </span>
+              )}
               <button
                 type="button"
                 onClick={handlePlayOnce}
@@ -928,6 +1084,33 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
               </div>
             </div>
           )}
+        </div>
+
+        {/* Quick Rapid Active Recall Assessment */}
+        <div className="px-5 py-3.5 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+            <span>⚡ ประเมินผลความจำ (Active Recall):</span>
+          </div>
+          <div className="flex items-center gap-2.5 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => handleRating(1)}
+              className="flex-1 sm:flex-none py-2 px-5 rounded-xl bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 dark:text-rose-300 border border-rose-300 dark:border-rose-800 text-xs font-bold transition shadow-2xs cursor-pointer flex items-center justify-center gap-1.5"
+              title="ยังจำไม่ได้ - ส่งไปทบทวนซ้ำ"
+            >
+              <span>🔴 จำไม่ได้</span>
+              <span className="text-[10px] opacity-75 font-normal">(ทบทวนซ้ำ)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleRating(3)}
+              className="flex-1 sm:flex-none py-2 px-6 rounded-xl bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-700 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 text-xs font-bold transition shadow-2xs cursor-pointer flex items-center justify-center gap-1.5"
+              title="จำได้แล้ว - บันทึกผ่าน"
+            >
+              <span>🟢 จำได้</span>
+              <span className="text-[10px] opacity-75 font-normal">(ผ่าน)</span>
+            </button>
+          </div>
         </div>
 
         {/* Self-Assessment Buttons (SM-2 Spaced Repetition) */}

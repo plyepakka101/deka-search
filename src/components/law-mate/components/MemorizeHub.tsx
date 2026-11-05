@@ -443,6 +443,19 @@ export const MemorizeHub: React.FC<MemorizeHubProps> = ({ settings }) => {
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0 text-xs">
+                        {item.status === 'mastered' || (typeof item.lastQuality === 'number' && item.lastQuality >= 3) ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                            🟢 จำได้
+                          </span>
+                        ) : item.status === 'learning' || item.lastQuality === 1 || item.lastQuality === 2 ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
+                            🔴 ยังจำไม่ได้
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                            ⚪ รอท่อง
+                          </span>
+                        )}
                         <span className={`font-semibold hidden sm:inline ${reviewStatus.color}`}>
                           {reviewStatus.label}
                         </span>
@@ -595,6 +608,19 @@ export const MemorizeHub: React.FC<MemorizeHubProps> = ({ settings }) => {
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0 text-xs">
+                        {item.status === 'mastered' || (typeof item.lastQuality === 'number' && item.lastQuality >= 3) ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                            🟢 จำได้
+                          </span>
+                        ) : item.status === 'learning' || item.lastQuality === 1 || item.lastQuality === 2 ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
+                            🔴 ยังจำไม่ได้
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                            ⚪ รอท่อง
+                          </span>
+                        )}
                         <span className={`font-semibold hidden sm:inline ${reviewStatus.color}`}>
                           {reviewStatus.label}
                         </span>

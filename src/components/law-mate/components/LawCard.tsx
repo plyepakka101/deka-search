@@ -15,7 +15,7 @@ import {
   resetAudio,
   unlockAudio,
 } from '@/lib/tts';
-import { addSectionToDeck, removeItem, getLocalItems, onMemorizeDataChanged } from '../services/memorizeService';
+import { addSectionToDeck, removeItem, getLocalItems, onMemorizeDataChanged, markSectionMastery } from '../services/memorizeService';
 
 interface LawCardProps {
   law: LawSection;
@@ -96,6 +96,19 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
 
   const existingMemoItem = memoItems.find(i => i.sectionId === law.id);
   const isInMemo = Boolean(existingMemoItem);
+  const isMastered = Boolean(
+    existingMemoItem && (
+      existingMemoItem.status === 'mastered' || 
+      (typeof existingMemoItem.lastQuality === 'number' && existingMemoItem.lastQuality >= 3)
+    )
+  );
+  const isNeedReview = Boolean(
+    existingMemoItem && (
+      existingMemoItem.status === 'learning' || 
+      existingMemoItem.lastQuality === 1 || 
+      existingMemoItem.lastQuality === 2
+    )
+  );
 
   const handleToggleMemorize = async () => {
     if (existingMemoItem) {
@@ -106,6 +119,10 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
     }
     const targetDeckId = `deck-${law.bookId || 'crim'}`;
     await addSectionToDeck(targetDeckId, law.id, `มาตรา ${law.sectionNumber}`);
+  };
+
+  const handleMarkMastery = async (remembered: boolean) => {
+    await markSectionMastery(law.id, law.bookId, remembered, `มาตรา ${law.sectionNumber}`);
   };
 
   const handleOpenQuickMemorize = async () => {
@@ -748,6 +765,17 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
                         <span>ในชุดท่องสอบ</span>
                     </span>
                 )}
+                {isMastered && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 font-bold flex items-center gap-1 shadow-xs">
+                        <span>🟢 จำได้แล้ว</span>
+                        {existingMemoItem?.streak ? <span className="opacity-75">({existingMemoItem.streak})</span> : null}
+                    </span>
+                )}
+                {isNeedReview && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/70 text-rose-700 dark:text-rose-300 font-bold flex items-center gap-1 shadow-xs">
+                        <span>🔴 ยังจำไม่ได้</span>
+                    </span>
+                )}
            </div>
         </div>
         
@@ -879,6 +907,39 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
             >
               <Play size={12} />
               <span>เริ่มท่อง</span>
+            </button>
+          </div>
+
+          {/* Quick Mastery Assessment Toggle (Active Recall) */}
+          <div className="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-0.5 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => handleMarkMastery(false)}
+              className={`flex items-center space-x-1 text-xs px-2.5 py-1.5 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${
+                isNeedReview
+                  ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 font-bold border border-rose-300 dark:border-rose-800'
+                  : 'text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:text-slate-400 dark:hover:bg-slate-800'
+              }`}
+              title={isNeedReview ? "บันทึกว่ายังจำไม่ได้ (กดเพื่อบันทึกซ้ำ)" : "ทำเครื่องหมายว่ายังจำไม่ได้ (ต้องการทบทวน)"}
+            >
+              <span>🔴</span>
+              <span>จำไม่ได้</span>
+            </button>
+
+            <div className="w-[1px] h-3.5 bg-slate-200 dark:bg-slate-800 mx-0.5" />
+
+            <button
+              type="button"
+              onClick={() => handleMarkMastery(true)}
+              className={`flex items-center space-x-1 text-xs px-2.5 py-1.5 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${
+                isMastered
+                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-800'
+                  : 'text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:text-slate-400 dark:hover:bg-slate-800'
+              }`}
+              title={isMastered ? `จำได้แล้ว (Streak ${existingMemoItem?.streak || 1})` : "ทำเครื่องหมายว่าจำได้แล้ว"}
+            >
+              <span>🟢</span>
+              <span>จำได้</span>
             </button>
           </div>
 
