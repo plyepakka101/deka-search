@@ -6,6 +6,15 @@ import { SECTION_REF_REGEX, thaiToArabic, createHighlightRegex } from '../utils/
 import { DiffView } from './DiffView';
 import { MemorizePlayer } from './MemorizePlayer';
 import { normalizeLawTextForTTS } from '@/lib/lawPhonetics';
+import {
+  DEFAULT_AZURE_VOICE,
+  getAudioUrl,
+  isAzureUnavailable,
+  pickBrowserVoice,
+  playAudioUrl,
+  resetAudio,
+  unlockAudio,
+} from '@/lib/tts';
 import { addSectionToDeck, removeItem, getLocalItems, onMemorizeDataChanged } from '../services/memorizeService';
 
 interface LawCardProps {
@@ -35,6 +44,8 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
   
   // Refs for TTS management
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const playTokenRef = useRef(0);
   const isLoopingRef = useRef(false);
 
   // Highlighting State
@@ -126,6 +137,8 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
 
   // Stop TTS when law changes or component unmounts
   useEffect(() => {
+    playTokenRef.current += 1;
+    resetAudio(audioRef.current);
     window.speechSynthesis.cancel();
     setIsPlaying(false);
     isLoopingRef.current = false;
@@ -142,7 +155,9 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
     }
 
     return () => {
-      window.speechSynthesis.cancel();
+      playTokenRef.current += 1;
+    resetAudio(audioRef.current);
+    window.speechSynthesis.cancel();
     };
   }, []);
 
@@ -195,70 +210,118 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
       window.location.href = `/search?tab=law&law_name=${encodeURIComponent(lawName)}&section=${encodeURIComponent(cleanSection)}`;
   }
 
-  const startReading = useCallback(() => {
-    const cleanSection = thaiToArabic(law.sectionNumber);
-    // Remove citation brackets like [1] from speech
-    const cleanContent = law.content.replace(/\[\d+\]/g, '');
-    const textToRead = normalizeLawTextForTTS(`มาตรา ${cleanSection}. ${cleanContent}`);
-    
-    const utterance = new SpeechSynthesisUtterance(textToRead);
+  const playBrowserTTS = useCallback((textToSpeak: string) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      alert('เบราว์เซอร์ของคุณไม่รองรับการอ่านออกเสียง');
+      setIsPlaying(false);
+      return;
+    }
+
+    playTokenRef.current += 1;
+    resetAudio(audioRef.current);
+    window.speechSynthesis.cancel();
+
+    const cleanText = normalizeLawTextForTTS(textToSpeak);
+    const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.rate = settings.speakingRate || 1.0;
 
     const voices = window.speechSynthesis.getVoices();
-    let selectedVoice = null;
+    const selectedVoice = pickBrowserVoice(voices, settings.voiceURI);
 
-    // If user selected a specific voice, try to find it
-    if (settings.voiceURI) {
-        selectedVoice = voices.find(v => v.voiceURI === settings.voiceURI);
-    }
-
-    // If no specific voice selected or found, try to find a Thai voice
-    if (!selectedVoice) {
-        selectedVoice = voices.find(v => v.lang === 'th-TH') || voices.find(v => v.lang.includes('th'));
-    }
-    
     if (selectedVoice) {
-        utterance.voice = selectedVoice;
+      utterance.voice = selectedVoice;
     } else {
-        // If still no voice, leave it default (browser default) but set lang just in case
-        utterance.lang = 'th-TH';
+      utterance.lang = 'th-TH';
     }
 
     utterance.onstart = () => {
-        setIsPlaying(true);
+      setIsPlaying(true);
     };
 
     utterance.onend = () => {
-        if (isLoopingRef.current) {
-            startReading(); // Loop again
-        } else {
-            setIsPlaying(false);
-            utteranceRef.current = null;
-        }
+      if (isLoopingRef.current) {
+        startReading();
+      } else {
+        setIsPlaying(false);
+        utteranceRef.current = null;
+      }
     };
 
     utterance.onerror = (e: any) => {
-        // Filter out canceled/interrupted errors which are normal
-        if (e.error === 'canceled' || e.error === 'interrupted') {
-            setIsPlaying(false);
-            utteranceRef.current = null;
-            return;
-        }
-        
-        console.error('TTS Error:', e.error);
-        // Prevent alert loop
-        if (!isLoopingRef.current) {
-            alert(`เกิดข้อผิดพลาดในการอ่านออกเสียง: ${e.error}`);
-        }
-        
+      if (e.error === 'canceled' || e.error === 'interrupted') {
         setIsPlaying(false);
         utteranceRef.current = null;
-        isLoopingRef.current = false;
+        return;
+      }
+      console.warn('Browser TTS error:', e);
+      setIsPlaying(false);
+      utteranceRef.current = null;
+      isLoopingRef.current = false;
     };
 
     utteranceRef.current = utterance;
     window.speechSynthesis.speak(utterance);
-  }, [law, settings.voiceURI, settings.speakingRate]);
+  }, [settings.speakingRate, settings.voiceURI]);
+
+  const startReading = useCallback(() => {
+    const cleanSection = thaiToArabic(law.sectionNumber);
+    // Remove citation brackets like [1] from speech
+    const cleanContent = law.content.replace(/\[\d+\]/g, '');
+    const textToRead = `มาตรา ${cleanSection}. ${cleanContent}`;
+    const provider = settings.ttsProvider || 'google';
+
+    if (
+      provider === 'browser' ||
+      (provider === 'azure' && isAzureUnavailable()) ||
+      typeof window === 'undefined'
+    ) {
+      playBrowserTTS(textToRead);
+      return;
+    }
+
+    const token = ++playTokenRef.current;
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+
+    const el = audioRef.current ?? new Audio();
+    audioRef.current = el;
+    resetAudio(el);
+    unlockAudio(el);
+    setIsPlaying(true);
+
+    const rate = settings.speakingRate || 1.0;
+    const voice = settings.azureVoice || DEFAULT_AZURE_VOICE;
+
+    getAudioUrl(textToRead, voice, rate, provider)
+      .then(url => {
+        if (token !== playTokenRef.current) return;
+        return playAudioUrl(
+          el,
+          url,
+          {
+            onEnded: () => {
+              if (token !== playTokenRef.current) return;
+              if (isLoopingRef.current) {
+                startReading();
+              } else {
+                setIsPlaying(false);
+              }
+            },
+            onError: () => {
+              if (token !== playTokenRef.current) return;
+              playBrowserTTS(textToRead);
+            },
+          },
+          rate
+        );
+      })
+      .catch(err => {
+        if (token !== playTokenRef.current) return;
+        console.warn(`${provider} TTS failed, using browser voice fallback:`, err);
+        playBrowserTTS(textToRead);
+      });
+  }, [law, settings, playBrowserTTS]);
 
   const handlePlayTTS = () => {
     if (!('speechSynthesis' in window)) {
@@ -268,11 +331,15 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
 
     if (isPlaying) {
       isLoopingRef.current = false;
-      window.speechSynthesis.cancel();
+      playTokenRef.current += 1;
+    resetAudio(audioRef.current);
+    window.speechSynthesis.cancel();
       setIsPlaying(false);
     } else {
       // Stop any current speech before starting
-      window.speechSynthesis.cancel();
+      playTokenRef.current += 1;
+    resetAudio(audioRef.current);
+    window.speechSynthesis.cancel();
       isLoopingRef.current = true;
       startReading();
     }

@@ -55,14 +55,14 @@ export function sliceParagraphs(rawContent: string): ParagraphSlice[] {
   // Check if first line is a section header like "มาตรา ๕๙" or "มาตรา 59 - เจตนาและประมาท"
   let startIndex = 0;
   let headerPrefix = '';
-  if (lines.length > 1 && /^มาตรา\s+[0-9๑-๙]+(\s*[-–:]\s*.*)?$/i.test(lines[0])) {
+  if (lines.length > 1 && /^มาตรา\s+[0-9๐-๙]+(\s*[-–:]\s*.*)?$/i.test(lines[0])) {
     headerPrefix = lines[0] + '\n';
     startIndex = 1;
   }
 
-  // Regex to check if a line is an enumerated sub-clause (อนุมาตรา) like (๑), (1), (ก), ๑., 1.
+  // Regex to check if a line is an enumerated sub-clause (อนุมาตรา) like (๑), (1), (ก), ๑., 1., (๑/๑)
   const isSubClause = (line: string) => {
-    return /^(\([0-9๑-๙a-zA-Zก-ฮ]+\)|[0-9๑-๙]+\.|\([ก-ฮ]\))\s*/.test(line);
+    return /^(?:\(\s*[0-9๐-๙a-zA-Zก-ฮ]+(?:\/[0-9๐-๙]+)?\s*\)|[0-9๐-๙]+\.|\([ก-ฮ]\))\s*/.test(line);
   };
 
   // Regex to check if a line is a penalty or closing clause completing sub-clauses in the same paragraph

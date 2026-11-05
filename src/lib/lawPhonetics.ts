@@ -7,9 +7,27 @@ export interface PhoneticOptions {
   useShortAnu?: boolean;
 }
 
-const SECTION_SLASH_REGEX = /(\d+(?:\s*[฀-๿]+)?)\/(\d+)/g;
-const SECTION_CHA_REGEX = /(\d+)\s*ฉ(?=[\s,]|$)/g;
-const SUBSECTION_REGEX = /(?:^|\n|\s)\(([0-9๐-๙]+)\)/g;
+const SECTION_SLASH_REGEX = /([0-9๐-๙]+(?:\s*[฀-๿]+)?)\/([0-9๐-๙]+)/g;
+const SECTION_CHA_REGEX = /([0-9๐-๙]+)\s*ฉ(?=[\s,]|$)/g;
+
+// Subsections with numbers or fractions: (๑), (1), ( ๑ ), (๑/๑), (1/1)
+const SUBSECTION_NUM_REGEX = /(?:^|[\s\n\r,;(])\(\s*([0-9๐-๙]+(?:\/[0-9๐-๙]+)?)\s*\)/g;
+
+// Subsections with Thai consonants: (ก), (ข), (ค)
+const SUBSECTION_ALPHA_REGEX = /(?:^|[\s\n\r,;(])\(\s*([ก-ฮ])\s*\)/g;
+
+// Line-start numbering with period: "1. ", "๑. "
+const LINE_START_NUM_REGEX = /(?:^|\n)\s*([0-9๐-๙]+)\.\s+/g;
+
+const THAI_DIGIT_MAP: Record<string, string> = {
+  '๐': '0', '๑': '1', '๒': '2', '๓': '3', '๔': '4',
+  '๕': '5', '๖': '6', '๗': '7', '๘': '8', '๙': '9',
+};
+
+export function thaiToArabicDigits(str: string): string {
+  if (!str) return '';
+  return str.replace(/[๐-๙]/g, ch => THAI_DIGIT_MAP[ch] || ch);
+}
 
 // Common Thai base words that are reduplicated by maiyamok in legal texts (sorted longest to shortest)
 const REPEATABLE_WORDS = [
@@ -34,15 +52,29 @@ export function normalizeLawTextForTTS(text: string, options: PhoneticOptions = 
   // 1. Phonetic fixes for known legal words that TTS mispronounces
   s = s.replace(/ลหุโทษ/g, 'ละหุโทด');
 
-  // 2. Section number fractions: "มาตรา 90/1" -> "มาตรา 90 ทับ 1"
-  s = s.replace(SECTION_SLASH_REGEX, '$1 ทับ $2');
+  // 2. Section number fractions: "มาตรา 90/1", "มาตรา ๗/๑" -> "มาตรา 90 ทับ 1"
+  s = s.replace(SECTION_SLASH_REGEX, (m, p1, p2) => `${thaiToArabicDigits(p1)} ทับ ${thaiToArabicDigits(p2)}`);
 
-  // 3. Section sub-letters: "มาตรา 106 ฉ" -> "มาตรา 106 ฉะ"
-  s = s.replace(SECTION_CHA_REGEX, '$1 ฉะ');
+  // 3. Section sub-letters: "มาตรา 106 ฉ", "มาตรา ๑๐๖ ฉ" -> "มาตรา 106 ฉะ"
+  s = s.replace(SECTION_CHA_REGEX, (m, p1) => `${thaiToArabicDigits(p1)} ฉะ`);
 
-  // 4. Subsections / Paragraphs: "(1)" -> "อนุมาตรา 1"
-  s = s.replace(SUBSECTION_REGEX, (match, num) => {
-    return ` ${anuPrefix} ${num} `;
+  // 4. Subsections / Paragraphs: "(1)", "(๑)", "( ๑ )", "(๑/๑)" -> "อนุมาตรา 1", "อนุมาตรา 1 ทับ 1"
+  s = s.replace(SUBSECTION_NUM_REGEX, (match, rawNum) => {
+    const prefix = match.startsWith('(') ? '' : match[0];
+    const numArabic = thaiToArabicDigits(rawNum).replace('/', ' ทับ ');
+    return `${prefix} ${anuPrefix} ${numArabic} `;
+  });
+
+  // 4b. Sub-clauses with Thai letters: "(ก)", "(ข)" -> "อนุ ก", "อนุ ข"
+  s = s.replace(SUBSECTION_ALPHA_REGEX, (match, letter) => {
+    const prefix = match.startsWith('(') ? '' : match[0];
+    return `${prefix} อนุ ${letter} `;
+  });
+
+  // 4c. Line-start numbered lists: "1. ", "๑. " -> "อนุมาตรา 1 "
+  s = s.replace(LINE_START_NUM_REGEX, (match, rawNum) => {
+    const numArabic = thaiToArabicDigits(rawNum);
+    return `\n${anuPrefix} ${numArabic} `;
   });
 
   // 5. Maiyamok ("ๆ") handling:
@@ -72,12 +104,17 @@ export function normalizeLawTextForTTS(text: string, options: PhoneticOptions = 
   s = s.replace(/รธน\./g, 'รัฐธรรมนูญ');
 
   // 7. Deka citation: "ฎีกาที่ 123/2560" -> "คำพิพากษาศาลฎีกาที่ 123 ทับ 2560"
-  s = s.replace(/ฎีกาที่\s*([0-9๐-๙]+)\/([0-9๐-๙]+)/g, 'คำพิพากษาศาลฎีกาที่ $1 ทับ $2');
+  s = s.replace(/ฎีกาที่\s*([0-9๐-๙]+)\/([0-9๐-๙]+)/g, (m, p1, p2) => 
+    `คำพิพากษาศาลฎีกาที่ ${thaiToArabicDigits(p1)} ทับ ${thaiToArabicDigits(p2)}`
+  );
 
   // 8. Strip quotation marks that cause TTS to read "เครื่องหมายคำพูด" or stutter
   s = s.replace(/[“”"']/g, ' ');
 
-  // 9. Normalize whitespace and clean up
+  // 9. Convert remaining Thai numerals to Arabic digits for 100% TTS compatibility
+  s = thaiToArabicDigits(s);
+
+  // 10. Normalize whitespace and clean up
   s = s.replace(/[ \t]+/g, ' ');
   s = s.replace(/\n\s+/g, '\n');
 
