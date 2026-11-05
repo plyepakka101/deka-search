@@ -41,6 +41,14 @@ import {
   ImportSummary,
 } from "@/components/law-mate/services/dataService";
 import { AppSettings, ExportOptions } from "@/components/law-mate/types";
+import {
+  AZURE_THAI_VOICES,
+  DEFAULT_AZURE_VOICE,
+  getAzureAudioUrl,
+  isAzureUnavailable,
+  pickBrowserVoice,
+  unlockAudio,
+} from "@/lib/tts";
 
 export default function SettingsPage() {
   const [session, setSession] = useState<any>(null);
@@ -200,30 +208,56 @@ export default function SettingsPage() {
   };
 
   // TTS Test Voice
-  const handleTestVoice = () => {
+  const testText = "ทดสอบการอ่านออกเสียง มาตรา 420 ผู้ใดจงใจหรือประมาทเลินเล่อ ทำต่อบุคคลอื่นโดยผิดกฎหมาย";
+
+  const testBrowserVoice = () => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
       alert("เบราว์เซอร์นี้ไม่รองรับระบบอ่านออกเสียง");
       return;
     }
     window.speechSynthesis.cancel();
-    const testText = "ทดสอบการอ่านออกเสียง มาตรา 420 ผู้ใดจงใจหรือประมาทเลินเล่อ ทำต่อบุคคลอื่นโดยผิดกฎหมาย";
     const utterance = new SpeechSynthesisUtterance(testText);
     utterance.lang = "th-TH";
     utterance.rate = settings.speakingRate || 1.0;
 
-    if (settings.voiceURI) {
-      const selected = voices.find(v => v.voiceURI === settings.voiceURI);
-      if (selected) utterance.voice = selected;
-    } else {
-      const thaiVoice = voices.find(v => v.lang.includes("th"));
-      if (thaiVoice) utterance.voice = thaiVoice;
-    }
+    const selected = pickBrowserVoice(voices, settings.voiceURI);
+    if (selected) utterance.voice = selected;
 
     utterance.onstart = () => setIsPlayingTestVoice(true);
     utterance.onend = () => setIsPlayingTestVoice(false);
     utterance.onerror = () => setIsPlayingTestVoice(false);
 
     window.speechSynthesis.speak(utterance);
+  };
+
+  const handleTestVoice = () => {
+    const provider = settings.ttsProvider ?? "azure";
+    if (provider !== "azure" || isAzureUnavailable()) {
+      testBrowserVoice();
+      return;
+    }
+
+    if (typeof window !== "undefined") window.speechSynthesis?.cancel();
+    const audio = new Audio();
+    unlockAudio(audio); // keep the click gesture for mobile Safari
+    setIsPlayingTestVoice(true);
+
+    getAzureAudioUrl(testText, settings.azureVoice || DEFAULT_AZURE_VOICE, settings.speakingRate || 1.0)
+      .then(url => {
+        audio.onended = () => setIsPlayingTestVoice(false);
+        audio.onerror = () => {
+          setIsPlayingTestVoice(false);
+          testBrowserVoice();
+        };
+        audio.src = url;
+        return audio.play();
+      })
+      .catch(err => {
+        console.warn("Azure TTS test failed, using browser voice:", err);
+        setIsPlayingTestVoice(false);
+        showToast("เสียงคุณภาพสูงใช้ไม่ได้ (ต้องเข้าสู่ระบบ/ตั้งค่า Azure) ใช้เสียงของเบราว์เซอร์แทน");
+        testBrowserVoice();
+      });
   };
 
   // Export Data
@@ -509,10 +543,48 @@ export default function SettingsPage() {
               </p>
             </div>
 
-            {/* Voice Selection */}
+            {/* Provider Selection */}
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                เลือกเสียงภาษาไทย
+                แหล่งเสียงอ่าน
+              </label>
+              <select
+                value={settings.ttsProvider ?? "azure"}
+                onChange={(e) => updateSetting("ttsProvider", e.target.value as "azure" | "browser")}
+                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
+              >
+                <option value="azure">เสียงคุณภาพสูง (Azure Neural) — ต้องเข้าสู่ระบบ</option>
+                <option value="browser">เสียงของเบราว์เซอร์ (ฟรี ทำงานออฟไลน์ได้)</option>
+              </select>
+              <p className="text-xs text-slate-400">
+                * ถ้าเสียงคุณภาพสูงใช้ไม่ได้ ระบบจะสลับไปใช้เสียงของเบราว์เซอร์ให้อัตโนมัติ
+              </p>
+            </div>
+
+            {/* Azure Voice Selection */}
+            {(settings.ttsProvider ?? "azure") === "azure" && (
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                  เลือกเสียง Azure
+                </label>
+                <select
+                  value={settings.azureVoice || DEFAULT_AZURE_VOICE}
+                  onChange={(e) => updateSetting("azureVoice", e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
+                >
+                  {AZURE_THAI_VOICES.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Browser Voice Selection */}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                เลือกเสียงภาษาไทยของเบราว์เซอร์
               </label>
               <select
                 value={settings.voiceURI || ""}

@@ -11,6 +11,15 @@ import { recordReview } from '../services/memorizeService';
 import { ReviewRating } from '../services/srsEngine';
 import { getSettings, getLaws } from '../services/dataService';
 import { thaiToArabic } from '../utils/textUtils';
+import {
+  DEFAULT_AZURE_VOICE,
+  getAzureAudioUrl,
+  isAzureUnavailable,
+  pickBrowserVoice,
+  playAudioUrl,
+  resetAudio,
+  unlockAudio,
+} from '@/lib/tts';
 
 export const getSectionNumber = (item?: MemorizationItem): string => {
   if (!item) return '';
@@ -58,6 +67,10 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
   const isLoopingRef = useRef(false);
   const loopTimerRef = useRef<any>(null);
   const countdownTimerRef = useRef<any>(null);
+
+  // Azure audio element + token that invalidates stale async playback
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const playTokenRef = useRef(0);
 
   // Update voiceRate if effectiveSettings changes
   useEffect(() => {
@@ -121,6 +134,10 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
       countdownTimerRef.current = null;
     }
 
+    // Invalidate any in-flight Azure request and stop its audio
+    playTokenRef.current += 1;
+    resetAudio(audioRef.current);
+
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
@@ -171,11 +188,15 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
   // -------------------------------------------------------------------
   // Single Audio playback handler
   // -------------------------------------------------------------------
-  const playSingleTTS = (textToSpeak: string, onEndCallback?: () => void) => {
+  const playBrowserTTS = (textToSpeak: string, onEndCallback?: () => void) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
       alert('เบราว์เซอร์ของคุณไม่รองรับ Speech Synthesis');
       return;
     }
+
+    // Stop any Azure audio that may still be playing
+    playTokenRef.current += 1;
+    resetAudio(audioRef.current);
 
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(textToSpeak);
@@ -183,17 +204,9 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
 
     const currentSettings = settings || getSettings();
     const availableVoices = voices.length > 0 ? voices : window.speechSynthesis.getVoices();
-    let selectedVoice: SpeechSynthesisVoice | null = null;
 
-    // 1. If user selected a specific voice in Settings, try to match it by voiceURI
-    if (currentSettings.voiceURI) {
-      selectedVoice = availableVoices.find(v => v.voiceURI === currentSettings.voiceURI) || null;
-    }
-
-    // 2. If no voice selected or specified voice not found, find a Thai voice
-    if (!selectedVoice) {
-      selectedVoice = availableVoices.find(v => v.lang === 'th-TH') || availableVoices.find(v => v.lang.includes('th')) || null;
-    }
+    // User's chosen voice if found, otherwise the most natural-sounding Thai voice available
+    const selectedVoice = pickBrowserVoice(availableVoices, currentSettings.voiceURI);
 
     if (selectedVoice) {
       utterance.voice = selectedVoice;
@@ -215,6 +228,47 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
     };
 
     window.speechSynthesis.speak(utterance);
+  };
+
+  // Azure Neural voice first; falls back to the browser voice on any failure
+  const playSingleTTS = (textToSpeak: string, onEndCallback?: () => void) => {
+    const currentSettings = settings || getSettings();
+    const provider = currentSettings.ttsProvider ?? 'azure';
+
+    if (provider !== 'azure' || isAzureUnavailable() || typeof window === 'undefined') {
+      playBrowserTTS(textToSpeak, onEndCallback);
+      return;
+    }
+
+    const token = ++playTokenRef.current;
+    window.speechSynthesis?.cancel();
+
+    const el = audioRef.current ?? new Audio();
+    audioRef.current = el;
+    resetAudio(el);
+    unlockAudio(el); // must run synchronously inside the user's click
+    setSpeaking(true);
+
+    getAzureAudioUrl(textToSpeak, currentSettings.azureVoice || DEFAULT_AZURE_VOICE, voiceRate)
+      .then(url => {
+        if (token !== playTokenRef.current) return;
+        return playAudioUrl(el, url, {
+          onEnded: () => {
+            if (token !== playTokenRef.current) return;
+            setSpeaking(false);
+            if (onEndCallback) onEndCallback();
+          },
+          onError: () => {
+            if (token !== playTokenRef.current) return;
+            playBrowserTTS(textToSpeak, onEndCallback);
+          },
+        });
+      })
+      .catch(err => {
+        if (token !== playTokenRef.current) return;
+        console.warn('Azure TTS failed, using browser voice:', err);
+        playBrowserTTS(textToSpeak, onEndCallback);
+      });
   };
 
   // -------------------------------------------------------------------

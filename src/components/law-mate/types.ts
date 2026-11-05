@@ -130,6 +130,8 @@ export interface AppSettings {
   lineHeight?: number; // 1.5, 1.8, 2.0
   voiceURI?: string;
   speakingRate?: number;
+  ttsProvider?: 'azure' | 'browser'; // default: 'azure' (falls back to browser voice)
+  azureVoice?: string; // e.g. 'th-TH-PremwadeeNeural'
 }
 
 export interface LawBook {
