@@ -60,9 +60,9 @@ export function sliceParagraphs(rawContent: string): ParagraphSlice[] {
     startIndex = 1;
   }
 
-  // Regex to check if a line is an enumerated sub-clause (อนุมาตรา) like (๑), (1), (ก), ๑., 1., (๑/๑)
+  // Regex to check if a line is an enumerated sub-clause (อนุมาตรา) like (๑), (1), (ก), ๑., 1., (๑/๑), (๒ ทวิ)
   const isSubClause = (line: string) => {
-    return /^(?:\(\s*[0-9๐-๙a-zA-Zก-ฮ]+(?:\/[0-9๐-๙]+)?\s*\)|[0-9๐-๙]+\.|\([ก-ฮ]\))\s*/.test(line);
+    return /^(?:[\(\（]\s*[0-9๐-๙a-zA-Zก-ฮ]+(?:\s*(?:ทวิ|ตรี|จัตวา|เบญจ|ฉอ|สัปต|สัตต|อัฐ|อัฏฐ|อัฎฐ|นพ|นว|ทศ))?(?:\/[0-9๐-๙]+)?\s*[\)\）]|[0-9๐-๙]+\.|\([ก-ฮ]\))\s*/.test(line);
   };
 
   // Regex to check if a line is a penalty or closing clause completing sub-clauses in the same paragraph

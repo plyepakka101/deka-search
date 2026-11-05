@@ -4,7 +4,17 @@ import { thaiToArabic, VALID_SUFFIXES } from '../utils/textUtils';
 import { getSectionTitle } from '@/lib/lawTitles';
 
 export const parseLaws = (rawText: string, bookId: string, bookName: string): LawSection[] => {
-  const lines = rawText.split('\n');
+  if (!rawText) return [];
+
+  // Normalize Windows line breaks, fullwidth parentheses, and invisible formatting characters
+  const normalizedText = rawText
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/[\uFF08\uFF5F]/g, '(')
+    .replace(/[\uFF09\uFF60]/g, ')')
+    .replace(/[\u200B-\u200D\uFEFF\u00AD]/g, '');
+
+  const lines = normalizedText.split('\n');
   const laws: LawSection[] = [];
   
   let currentPart = ''; // ภาค / บรรพ

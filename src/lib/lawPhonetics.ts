@@ -10,11 +10,16 @@ export interface PhoneticOptions {
 const SECTION_SLASH_REGEX = /([0-9๐-๙]+(?:\s*[฀-๿]+)?)\/([0-9๐-๙]+)/g;
 const SECTION_CHA_REGEX = /([0-9๐-๙]+)\s*ฉ(?=[\s,]|$)/g;
 
-// Subsections with numbers or fractions: (๑), (1), ( ๑ ), (๑/๑), (1/1)
-const SUBSECTION_NUM_REGEX = /(?:^|[\s\n\r,;(])\(\s*([0-9๐-๙]+(?:\/[0-9๐-๙]+)?)\s*\)/g;
+const SUBSECTION_SUFFIXES = 'ทวิ|ตรี|จัตวา|เบญจ|ฉอ|สัปต|สัตต|อัฐ|อัฏฐ|อัฎฐ|นพ|นว|ทศ';
+
+// Subsections with numbers, suffixes, or fractions: (๑), (1), ( ๑ ), (๑/๑), (1/1), (๒ ทวิ)
+const SUBSECTION_NUM_REGEX = new RegExp(
+  `(?:^|[\\s\\n\\r,;(])\\(\\s*([0-9๐-๙]+(?:\\s*(?:${SUBSECTION_SUFFIXES}))?(?:\\/[0-9๐-๙]+)?)\\s*\\)`,
+  'g'
+);
 
 // Subsections with Thai consonants: (ก), (ข), (ค)
-const SUBSECTION_ALPHA_REGEX = /(?:^|[\s\n\r,;(])\(\s*([ก-ฮ])\s*\)/g;
+const SUBSECTION_ALPHA_REGEX = /(?:^|[\s\n\r,;(])\(\s*([ก-ฮ](?:\/[0-9๐-๙]+)?)\s*\)/g;
 
 // Line-start numbering with period: "1. ", "๑. "
 const LINE_START_NUM_REGEX = /(?:^|\n)\s*([0-9๐-๙]+)\.\s+/g;
@@ -49,33 +54,40 @@ export function normalizeLawTextForTTS(text: string, options: PhoneticOptions = 
 
   let s = String(text);
 
+  // 0. Normalize fullwidth parentheses and invisible/formatting Unicode characters
+  s = s.replace(/[\uFF08\uFF5F]/g, '(').replace(/[\uFF09\uFF60]/g, ')');
+  s = s.replace(/[\u200B-\u200D\uFEFF\u00AD]/g, '');
+  s = s.replace(/[\u00A0\u3000]/g, ' ');
+
   // 1. Phonetic fixes for known legal words that TTS mispronounces
   s = s.replace(/ลหุโทษ/g, 'ละหุโทด');
 
-  // 2. Section number fractions: "มาตรา 90/1", "มาตรา ๗/๑" -> "มาตรา 90 ทับ 1"
-  s = s.replace(SECTION_SLASH_REGEX, (m, p1, p2) => `${thaiToArabicDigits(p1)} ทับ ${thaiToArabicDigits(p2)}`);
-
-  // 3. Section sub-letters: "มาตรา 106 ฉ", "มาตรา ๑๐๖ ฉ" -> "มาตรา 106 ฉะ"
-  s = s.replace(SECTION_CHA_REGEX, (m, p1) => `${thaiToArabicDigits(p1)} ฉะ`);
-
-  // 4. Subsections / Paragraphs: "(1)", "(๑)", "( ๑ )", "(๑/๑)" -> "อนุมาตรา 1", "อนุมาตรา 1 ทับ 1"
+  // 2. Subsections / Paragraphs: "(1)", "(๑)", "( ๑ )", "(๑/๑)", "(๒ ทวิ)" -> "อนุมาตรา 1", "อนุมาตรา 1 ทับ 1", "อนุมาตรา 2 ทวิ"
+  // (Must run BEFORE section slash regex so (1/1) is recognized as subsection rather than section number fraction)
   s = s.replace(SUBSECTION_NUM_REGEX, (match, rawNum) => {
     const prefix = match.startsWith('(') ? '' : match[0];
     const numArabic = thaiToArabicDigits(rawNum).replace('/', ' ทับ ');
     return `${prefix} ${anuPrefix} ${numArabic} `;
   });
 
-  // 4b. Sub-clauses with Thai letters: "(ก)", "(ข)" -> "อนุ ก", "อนุ ข"
-  s = s.replace(SUBSECTION_ALPHA_REGEX, (match, letter) => {
+  // 2b. Sub-clauses with Thai letters: "(ก)", "(ข)", "(ก/๑)" -> "อนุ ก", "อนุ ข"
+  s = s.replace(SUBSECTION_ALPHA_REGEX, (match, rawLetter) => {
     const prefix = match.startsWith('(') ? '' : match[0];
+    const letter = thaiToArabicDigits(rawLetter).replace('/', ' ทับ ');
     return `${prefix} อนุ ${letter} `;
   });
 
-  // 4c. Line-start numbered lists: "1. ", "๑. " -> "อนุมาตรา 1 "
+  // 2c. Line-start numbered lists: "1. ", "๑. " -> "อนุมาตรา 1 "
   s = s.replace(LINE_START_NUM_REGEX, (match, rawNum) => {
     const numArabic = thaiToArabicDigits(rawNum);
     return `\n${anuPrefix} ${numArabic} `;
   });
+
+  // 3. Section number fractions: "มาตรา 90/1", "มาตรา ๗/๑" -> "มาตรา 90 ทับ 1"
+  s = s.replace(SECTION_SLASH_REGEX, (m, p1, p2) => `${thaiToArabicDigits(p1)} ทับ ${thaiToArabicDigits(p2)}`);
+
+  // 4. Section sub-letters: "มาตรา 106 ฉ", "มาตรา ๑๐๖ ฉ" -> "มาตรา 106 ฉะ"
+  s = s.replace(SECTION_CHA_REGEX, (m, p1) => `${thaiToArabicDigits(p1)} ฉะ`);
 
   // 5. Maiyamok ("ๆ") handling:
   // Converts e.g. "ใด ๆ" -> "ใด ใด", "อื่น ๆ" -> "อื่น อื่น", "ต่าง ๆ" -> "ต่าง ต่าง"
