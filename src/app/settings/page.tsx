@@ -210,7 +210,7 @@ export default function SettingsPage() {
   };
 
   // TTS Test Voice
-  const testText = "ทดสอบการอ่านออกเสียง มาตรา 90/1 ลหุโทษ (1) ตาม พ.ร.บ.ล้มละลาย ผู้ใดจงใจหรือประมาทเลินเล่อ";
+  const testText = "ทดสอบการอ่านออกเสียง มาตรา 90/1 ลหุโทษ (1) บุคคลอื่น ๆ หรือสถานที่ใด ๆ ตาม พ.ร.บ.ล้มละลาย";
 
   const testBrowserVoice = () => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
