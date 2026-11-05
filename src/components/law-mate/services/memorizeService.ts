@@ -539,6 +539,37 @@ export async function deleteDeck(deckId: string): Promise<boolean> {
 }
 
 /**
+ * Get user-created custom folders/playlists
+ */
+export function getUserFolders(): MemorizationDeck[] {
+  return getLocalDecks().filter(d => !d.isBuiltin);
+}
+
+/**
+ * Get custom folders that contain a specific section
+ */
+export function getSectionFolders(sectionId: string): MemorizationDeck[] {
+  const localItems = readJson<MemorizationItem[]>(MEMO_ITEMS_KEY, []);
+  const inDecks = new Set(localItems.filter(i => i.sectionId === sectionId).map(i => i.deckId));
+  return getUserFolders().filter(f => inDecks.has(f.id));
+}
+
+/**
+ * Toggle a section's inclusion in a custom folder
+ */
+export async function toggleSectionInFolder(deckId: string, sectionId: string, title?: string): Promise<boolean> {
+  const localItems = readJson<MemorizationItem[]>(MEMO_ITEMS_KEY, []);
+  const existing = localItems.find(i => i.deckId === deckId && i.sectionId === sectionId);
+  if (existing) {
+    await removeItem(existing.id);
+    return false; // Removed
+  } else {
+    await addSectionToDeck(deckId, sectionId, title);
+    return true; // Added
+  }
+}
+
+/**
  * Background initial loader
  */
 if (typeof window !== 'undefined') {

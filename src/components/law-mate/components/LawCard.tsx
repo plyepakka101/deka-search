@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { LawSection, UserNote, AppSettings, TextHighlight } from '../types';
 import { getOriginalLaw, getBooks } from '../services/dataService';
-import { BookOpen, Edit, Save, Trash2, ExternalLink, Star, Share2, Volume2, Square, Scale, History, Search, Highlighter, X, Brain, Play, GraduationCap, ChevronRight } from 'lucide-react';
+import { BookOpen, Edit, Save, Trash2, ExternalLink, Star, Share2, Volume2, Square, Scale, History, Search, Highlighter, X, Brain, Play, GraduationCap, ChevronRight, Folder, Check } from 'lucide-react';
 import { SECTION_REF_REGEX, thaiToArabic, createHighlightRegex } from '../utils/textUtils';
 import { DiffView } from './DiffView';
 import { MemorizePlayer } from './MemorizePlayer';
@@ -15,7 +15,10 @@ import {
   resetAudio,
   unlockAudio,
 } from '@/lib/tts';
-import { addSectionToDeck, removeItem, getLocalItems, onMemorizeDataChanged, markSectionMastery } from '../services/memorizeService';
+import { 
+  addSectionToDeck, removeItem, getLocalItems, onMemorizeDataChanged, 
+  markSectionMastery, getUserFolders, getSectionFolders, toggleSectionInFolder, saveDeck 
+} from '../services/memorizeService';
 
 interface LawCardProps {
   law: LawSection;
@@ -88,11 +91,21 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
   const [memoItems, setMemoItems] = useState(getLocalItems());
   const [showQuickMemorizeModal, setShowQuickMemorizeModal] = useState(false);
 
+  // Custom Folders State
+  const [showFolderModal, setShowFolderModal] = useState(false);
+  const [userFolders, setUserFolders] = useState(getUserFolders());
+  const [sectionFolders, setSectionFolders] = useState(getSectionFolders(law.id));
+  const [newFolderName, setNewFolderName] = useState('');
+
   useEffect(() => {
+    setUserFolders(getUserFolders());
+    setSectionFolders(getSectionFolders(law.id));
     return onMemorizeDataChanged(() => {
       setMemoItems(getLocalItems());
+      setUserFolders(getUserFolders());
+      setSectionFolders(getSectionFolders(law.id));
     });
-  }, []);
+  }, [law.id]);
 
   const existingMemoItem = memoItems.find(i => i.sectionId === law.id);
   const isInMemo = Boolean(existingMemoItem);
@@ -123,6 +136,27 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
 
   const handleMarkMastery = async (remembered: boolean) => {
     await markSectionMastery(law.id, law.bookId, remembered, `มาตรา ${law.sectionNumber}`);
+  };
+
+  const handleToggleFolder = async (folderId: string) => {
+    await toggleSectionInFolder(folderId, law.id, `มาตรา ${law.sectionNumber}`);
+    setUserFolders(getUserFolders());
+    setSectionFolders(getSectionFolders(law.id));
+  };
+
+  const handleCreateFolderAndAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFolderName.trim()) return;
+    const folderId = await saveDeck({
+      name: newFolderName.trim(),
+      color: 'bg-amber-600'
+    });
+    if (folderId) {
+      await addSectionToDeck(folderId, law.id, `มาตรา ${law.sectionNumber}`);
+      setNewFolderName('');
+      setUserFolders(getUserFolders());
+      setSectionFolders(getSectionFolders(law.id));
+    }
   };
 
   const handleOpenQuickMemorize = async () => {
@@ -776,6 +810,17 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
                         <span>🔴 ยังจำไม่ได้</span>
                     </span>
                 )}
+                {sectionFolders.map(f => (
+                    <span 
+                      key={f.id} 
+                      onClick={() => setShowFolderModal(true)}
+                      className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-bold border border-amber-200 dark:border-amber-800 flex items-center gap-1 shadow-2xs cursor-pointer hover:bg-amber-100 transition"
+                      title={`อยู่ในโฟลเดอร์: ${f.name} (คลิกเพื่อจัดการ)`}
+                    >
+                        <Folder size={10} />
+                        <span>{f.name}</span>
+                    </span>
+                ))}
            </div>
         </div>
         
@@ -942,6 +987,21 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
               <span>จำได้</span>
             </button>
           </div>
+
+          {/* Custom Folder Management Button */}
+          <button 
+            type="button"
+            onClick={() => setShowFolderModal(true)}
+            className={`flex items-center space-x-1.5 text-xs sm:text-sm px-3 py-1.5 rounded-xl border transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${
+              sectionFolders.length > 0 
+                ? 'text-amber-800 bg-amber-50 border-amber-300 dark:text-amber-300 dark:bg-amber-950/60 dark:border-amber-800 font-bold' 
+                : 'text-slate-600 dark:text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-800'
+            }`}
+            title="จัดเก็บมาตรานี้ลงในโฟลเดอร์ของฉัน (เพลย์ลิสต์ส่วนตัว)"
+          >
+            <Folder size={15} className={sectionFolders.length > 0 ? "text-amber-600 dark:text-amber-400" : ""} />
+            <span>{sectionFolders.length > 0 ? `โฟลเดอร์ (${sectionFolders.length})` : 'โฟลเดอร์'}</span>
+          </button>
 
           {/* Related Exams Button */}
           <button 
@@ -1150,6 +1210,92 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
               onFinish={() => setShowQuickMemorizeModal(false)}
               onBack={() => setShowQuickMemorizeModal(false)}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Custom Folder Management Modal */}
+      {showFolderModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <Folder className="text-amber-600 dark:text-amber-400" size={20} />
+                <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                  จัดเก็บในโฟลเดอร์ของฉัน
+                </h3>
+              </div>
+              <button 
+                onClick={() => setShowFolderModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+              เลือกโฟลเดอร์ที่ต้องการจัดเก็บ <span className="font-bold text-slate-700 dark:text-slate-200">มาตรา {law.sectionNumber}</span> เพื่อใช้ฝึกท่องหรือฟังวนลูป:
+            </div>
+
+            {/* Folder list */}
+            <div className="max-h-56 overflow-y-auto space-y-1.5">
+              {userFolders.length === 0 ? (
+                <div className="py-6 text-center text-xs text-slate-400 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
+                  ยังไม่มีโฟลเดอร์ส่วนตัว สร้างโฟลเดอร์แรกของคุณได้ด้านล่างนี้
+                </div>
+              ) : (
+                userFolders.map(folder => {
+                  const isInFolder = sectionFolders.some(f => f.id === folder.id);
+                  return (
+                    <button
+                      key={folder.id}
+                      type="button"
+                      onClick={() => handleToggleFolder(folder.id)}
+                      className={`w-full py-2.5 px-3 rounded-xl flex items-center justify-between transition cursor-pointer text-xs font-semibold ${
+                        isInFolder 
+                          ? 'bg-amber-50 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200 border border-amber-300 dark:border-amber-800 shadow-2xs'
+                          : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-100 dark:border-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <Folder size={15} className={isInFolder ? "text-amber-600 dark:text-amber-400 shrink-0" : "text-slate-400 shrink-0"} />
+                        <span className="truncate">{folder.name}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0 pl-2">
+                        {isInFolder ? (
+                          <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold text-[11px]">
+                            <Check size={14} />
+                            <span>อยู่ในโฟลเดอร์</span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-[11px]">
+                            + เพิ่มเข้า
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Inline new folder creation */}
+            <form onSubmit={handleCreateFolderAndAdd} className="pt-2 border-t dark:border-slate-800 flex gap-2">
+              <input
+                type="text"
+                value={newFolderName}
+                onChange={e => setNewFolderName(e.target.value)}
+                placeholder="สร้างโฟลเดอร์ใหม่ เช่น เนติ ขาอาญา..."
+                className="flex-1 px-3 py-2 rounded-xl border dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100 outline-none focus:border-amber-500"
+              />
+              <button
+                type="submit"
+                disabled={!newFolderName.trim()}
+                className="px-3 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer shadow-2xs"
+              >
+                สร้างและจัดเก็บ
+              </button>
+            </form>
           </div>
         </div>
       )}
