@@ -1,17 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Noto_Sans_Thai } from "next/font/google";
 import "./globals.css";
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-});
-
-const notoSansThai = Noto_Sans_Thai({
-  variable: "--font-noto-sans-thai",
-  subsets: ["thai", "latin"],
-  weight: ["300", "400", "500", "600", "700"],
-});
 
 export const metadata: Metadata = {
   title: "Deka Search | ระบบสืบค้นคำพิพากษาศาลฎีกา",
@@ -34,10 +22,15 @@ export default async function RootLayout({
 }>) {
   const session = await auth();
   return (
-    <html
-      lang="th"
-      className={`${inter.variable} ${notoSansThai.variable} h-full antialiased`}
-    >
+    <html lang="th" className="h-full antialiased">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap"
+        />
+      </head>
       <body className="min-h-full flex flex-col font-thai bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-200">
         <Providers session={session}>
           <ThemeInitializer />
