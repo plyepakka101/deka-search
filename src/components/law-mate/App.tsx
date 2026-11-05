@@ -447,12 +447,7 @@ const App: React.FC = () => {
                 </div>
                 )}
 
-                {view === ViewState.TOC && (
-                <div className="flex flex-col space-y-2">
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">สารบัญ</h2>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm">เลือกหัวข้อเพื่อไปยังส่วนที่ต้องการ</p>
-                </div>
-                )}
+
 
                 {view === ViewState.SEARCH && (
                 <div className="relative">

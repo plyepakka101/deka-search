@@ -35,7 +35,10 @@ export const createHighlightRegex = (query: string): RegExp | null => {
   return new RegExp(`(${pattern})`, 'gi');
 };
 
-export const VALID_SUFFIXES = ['ทวิ', 'ตรี', 'จัตวา', 'เบญจ', 'ฉ', 'สัตต', 'อัฏฐ', 'อัฎฐ', 'นว', 'ทศ'];
+export const VALID_SUFFIXES = [
+  'ทวิ', 'ตรี', 'จัตวา', 'เบญจ', 'ฉอ', 'ฉ', 'สัปต', 'สัตต', 'อัฐ', 'อัฏฐ', 'อัฎฐ', 'นพ', 'นว', 'ทศ',
+  'เอกาทศ', 'ทวาทศ', 'เตรส', 'จตุทศ', 'ปัณรส', 'โสฬส', 'สัตตรส', 'อัฏฐารส'
+];
 
 // Regex to match "มาตรา 123", "มาตรา ๑๒๓", "มาตรา 123/1", "มาตรา 30 ทวิ"
 // Captures the number part for linking
