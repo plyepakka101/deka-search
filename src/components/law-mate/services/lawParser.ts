@@ -1,6 +1,7 @@
 
 import { LawSection } from '../types';
 import { thaiToArabic, VALID_SUFFIXES } from '../utils/textUtils';
+import { getSectionTitle } from '@/lib/lawTitles';
 
 export const parseLaws = (rawText: string, bookId: string, bookName: string): LawSection[] => {
   const lines = rawText.split('\n');
@@ -29,12 +30,15 @@ export const parseLaws = (rawText: string, bookId: string, bookName: string): La
       if (cleanContent) {
         // Generate a deterministic ID based on the book prefix and section number
         const normNum = thaiToArabic(currentSectionNumber).replace(/\//g, '-').replace(/\s+/g, '-');
+        const rawNum = thaiToArabic(currentSectionNumber).trim();
+        const sectionTitle = getSectionTitle(bookId, rawNum) || getSectionTitle(bookName, rawNum);
         laws.push({
           id: `${bookId}-${normNum}`, // e.g., crim-112, civil-1
           sectionNumber: currentSectionNumber, 
           content: cleanContent,
           category: category,
-          bookId: bookId
+          bookId: bookId,
+          title: sectionTitle,
         });
       }
       

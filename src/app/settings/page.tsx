@@ -46,6 +46,7 @@ import {
   DEFAULT_AZURE_VOICE,
   getAudioUrl,
   isAzureUnavailable,
+  normalizeLawTextForTTS,
   pickBrowserVoice,
   unlockAudio,
 } from "@/lib/tts";
@@ -66,6 +67,7 @@ export default function SettingsPage() {
     lineHeight: 1.8,
     voiceURI: "",
     speakingRate: 1.0,
+    ttsProvider: "google",
   });
 
   // Export & counts
@@ -208,7 +210,7 @@ export default function SettingsPage() {
   };
 
   // TTS Test Voice
-  const testText = "ทดสอบการอ่านออกเสียง มาตรา 420 ผู้ใดจงใจหรือประมาทเลินเล่อ ทำต่อบุคคลอื่นโดยผิดกฎหมาย";
+  const testText = "ทดสอบการอ่านออกเสียง มาตรา 90/1 ลหุโทษ (1) ตาม พ.ร.บ.ล้มละลาย ผู้ใดจงใจหรือประมาทเลินเล่อ";
 
   const testBrowserVoice = () => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
@@ -216,7 +218,8 @@ export default function SettingsPage() {
       return;
     }
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(testText);
+    const cleanText = normalizeLawTextForTTS(testText);
+    const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.lang = "th-TH";
     utterance.rate = settings.speakingRate || 1.0;
 

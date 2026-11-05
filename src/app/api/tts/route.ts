@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { normalizeLawTextForTTS } from '@/lib/lawPhonetics';
 
 // Multi-provider TTS proxy:
 // 1. 'google': Free, unlimited, no key required (with auto-chunking & stitching)
@@ -90,7 +91,8 @@ async function fetchEdgeTTS(text: string, voice = 'th-TH-PremwadeeNeural'): Prom
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => null);
-    const text = typeof body?.text === 'string' ? body.text.trim() : '';
+    const rawText = typeof body?.text === 'string' ? body.text.trim() : '';
+    const text = normalizeLawTextForTTS(rawText);
     const voice = typeof body?.voice === 'string' ? body.voice : 'th-TH-PremwadeeNeural';
     const provider = typeof body?.provider === 'string' ? body.provider : 'azure';
     const rawRate = Number(body?.rate);

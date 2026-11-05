@@ -7,6 +7,7 @@ export interface LawSection {
   isCustom?: boolean;
   bookId?: string; // e.g., 'crim', 'civil'
   sourceUrl?: string; // Override book's source URL
+  title?: string; // e.g. "บทนิยาม", "หลักดินแดน", "ฆ่าผู้อื่น"
 }
 
 export interface TextHighlight {

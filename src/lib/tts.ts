@@ -1,8 +1,10 @@
 // Client-side helpers for Text-to-Speech: Azure Neural, Edge-TTS, Google Cloud TTS
 // and browser speechSynthesis fallback.
 import { TtsProvider } from '@/components/law-mate/types';
+import { normalizeLawTextForTTS } from './lawPhonetics';
 
 export type { TtsProvider };
+export { normalizeLawTextForTTS };
 
 export const AZURE_THAI_VOICES = [
   { id: 'th-TH-PremwadeeNeural', label: 'Premwadee (หญิง)' },
@@ -77,7 +79,8 @@ export async function getAudioUrl(
   rate: number,
   provider: TtsProvider = 'azure'
 ): Promise<string> {
-  const key = await sha256Hex(`${provider}|${voice}|${rate}|${text}`);
+  const cleanText = normalizeLawTextForTTS(text);
+  const key = await sha256Hex(`${provider}|${voice}|${rate}|${cleanText}`);
 
   const inMemory = memoryCache.get(key);
   if (inMemory) return inMemory;
@@ -101,7 +104,7 @@ export async function getAudioUrl(
   const res = await fetch('/api/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, voice, rate, provider }),
+    body: JSON.stringify({ text: cleanText, voice, rate, provider }),
   });
 
   if (!res.ok) {

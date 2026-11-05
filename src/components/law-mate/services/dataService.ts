@@ -10,7 +10,7 @@ let isRevalidating = false;
 
 const IDB_NAME = 'thai_law_mate_cache';
 const IDB_STORE = 'laws_store';
-const IDB_KEY = 'parsed_laws_v2';
+const IDB_KEY = 'parsed_laws_v3';
 
 // Cross-tab synchronization
 if (typeof window !== 'undefined') {
@@ -615,10 +615,21 @@ export const resetData = (options?: { resetNotes?: boolean; resetLaws?: boolean;
 };
 
 export const getSettings = (): AppSettings => {
-  if (typeof window === 'undefined') return { darkMode: false, fontSize: 2, fontStyle: 'modern', lineHeight: 1.8, voiceURI: '', speakingRate: 1.0 };
+  if (typeof window === 'undefined')
+    return {
+      darkMode: false,
+      fontSize: 2,
+      fontStyle: 'modern',
+      lineHeight: 1.8,
+      voiceURI: '',
+      speakingRate: 1.0,
+      ttsProvider: 'google',
+    };
   const stored = localStorage.getItem(SETTINGS_KEY);
   if (stored) {
-    return JSON.parse(stored);
+    const parsed = JSON.parse(stored);
+    if (!parsed.ttsProvider) parsed.ttsProvider = 'google';
+    return parsed;
   }
   return {
     darkMode: false,
@@ -626,7 +637,8 @@ export const getSettings = (): AppSettings => {
     fontStyle: 'modern',
     lineHeight: 1.8,
     voiceURI: '',
-    speakingRate: 1.0
+    speakingRate: 1.0,
+    ttsProvider: 'google',
   };
 };
 

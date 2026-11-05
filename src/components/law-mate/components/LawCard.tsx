@@ -5,6 +5,7 @@ import { BookOpen, Edit, Save, Trash2, ExternalLink, Star, Share2, Volume2, Squa
 import { SECTION_REF_REGEX, thaiToArabic, createHighlightRegex } from '../utils/textUtils';
 import { DiffView } from './DiffView';
 import { MemorizePlayer } from './MemorizePlayer';
+import { normalizeLawTextForTTS } from '@/lib/lawPhonetics';
 import { addSectionToDeck, removeItem, getLocalItems, onMemorizeDataChanged } from '../services/memorizeService';
 
 interface LawCardProps {
@@ -198,7 +199,7 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
     const cleanSection = thaiToArabic(law.sectionNumber);
     // Remove citation brackets like [1] from speech
     const cleanContent = law.content.replace(/\[\d+\]/g, '');
-    const textToRead = `มาตรา ${cleanSection}. ${cleanContent}`;
+    const textToRead = normalizeLawTextForTTS(`มาตรา ${cleanSection}. ${cleanContent}`);
     
     const utterance = new SpeechSynthesisUtterance(textToRead);
     utterance.rate = settings.speakingRate || 1.0;
@@ -604,6 +605,7 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
                       }}
                     >
                      มาตรา {law.sectionNumber}
+                     {law.title ? <span className="text-sm font-normal text-slate-500 dark:text-slate-400 ml-1.5">({law.title})</span> : null}
                     </span>
                 )}
                 {renderSegments}

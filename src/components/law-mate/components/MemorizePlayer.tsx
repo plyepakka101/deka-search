@@ -15,6 +15,7 @@ import {
   DEFAULT_AZURE_VOICE,
   getAudioUrl,
   isAzureUnavailable,
+  normalizeLawTextForTTS,
   pickBrowserVoice,
   playAudioUrl,
   resetAudio,
@@ -199,7 +200,8 @@ export const MemorizePlayer: React.FC<Props> = ({ items, deckTitle, settings, on
     resetAudio(audioRef.current);
 
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    const cleanText = normalizeLawTextForTTS(textToSpeak);
+    const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.rate = voiceRate;
 
     const currentSettings = settings || getSettings();
