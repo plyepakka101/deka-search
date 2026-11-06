@@ -18,6 +18,16 @@ const lawNameToBookId: Record<string, string> = {
   "ประมวลกฎหมายแพ่งและพาณิชย์": "civil",
   "ประมวลกฎหมายวิธีพิจารณาความอาญา": "crim_proc",
   "ประมวลกฎหมายวิธีพิจารณาความแพ่ง": "civil_proc",
+  "รัฐธรรมนูญแห่งราชอาณาจักรไทย": "const",
+  "พระราชบัญญัติล้มละลาย": "bankruptcy",
+  "พ.ร.บ. จัดตั้งศาลแขวงและวิธีพิจารณาความอาญาในศาลแขวง": "kwaeng",
+  "พระธรรมนูญศาลยุติธรรม": "court_const",
+  "พระราชบัญญัติวิธีพิจารณาคดีผู้บริโภค พ.ศ. 2551": "consumer_proc",
+  "พระราชบัญญัติลิขสิทธิ์ พ.ศ. 2537": "copyright",
+  "พระราชบัญญัติศาลเยาวชนและครอบครัวและวิธีพิจารณาคดีเยาวชนและครอบครัว พ.ศ. 2553": "juvenile_court",
+  "พระราชบัญญัติคุ้มครองแรงงาน พ.ศ. 2541": "labour_protection",
+  "พระราชบัญญัติจัดตั้งศาลปกครองและวิธีพิจารณาคดีปกครอง พ.ศ. 2542": "admin_court",
+  "ประมวลรัษฎากร": "revenue",
 };
 
 export default function PinToSectionButton({ decisionId, lawName, sectionNumber, className = "" }: PinToSectionButtonProps) {

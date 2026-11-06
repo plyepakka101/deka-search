@@ -10,7 +10,7 @@ let isRevalidating = false;
 
 const IDB_NAME = 'thai_law_mate_cache';
 const IDB_STORE = 'laws_store';
-const IDB_KEY = 'parsed_laws_v4';
+const IDB_KEY = 'parsed_laws_v5';
 
 // Cross-tab synchronization
 if (typeof window !== 'undefined') {
