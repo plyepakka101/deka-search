@@ -2,7 +2,8 @@
 
 import { Pin } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { UserNote } from './law-mate/types';
+import { UserNote } from '@/components/law-mate/types';
+import { getNotes, saveNote, syncAdminImportantSections } from '@/components/law-mate/services/dataService';
 
 interface PinToSectionButtonProps {
   decisionId: string;
@@ -10,8 +11,6 @@ interface PinToSectionButtonProps {
   sectionNumber: string;
   className?: string;
 }
-
-const STORAGE_KEY = 'thai_law_mate_notes';
 
 const lawNameToBookId: Record<string, string> = {
   "ประมวลกฎหมายอาญา": "crim",
@@ -42,43 +41,61 @@ export default function PinToSectionButton({ decisionId, lawName, sectionNumber,
     setMounted(true);
     if (!sectionId) return;
 
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const notes: Record<string, UserNote> = JSON.parse(stored);
+    const checkPinStatus = () => {
+      try {
+        const notes = getNotes();
         const note = notes[sectionId];
         if (note && note.linkedDekaIds && note.linkedDekaIds.includes(decisionId)) {
           setIsPinned(true);
+        } else {
+          setIsPinned(false);
         }
+      } catch (e) {
+        console.error('Failed to parse notes', e);
       }
-    } catch (e) {
-      console.error('Failed to parse notes', e);
-    }
+    };
+
+    checkPinStatus();
+
+    // Background sync with server if admin
+    syncAdminImportantSections().then(checkPinStatus).catch(() => {});
+
+    window.addEventListener('laws-notes-updated', checkPinStatus);
+    return () => {
+      window.removeEventListener('laws-notes-updated', checkPinStatus);
+    };
   }, [sectionId, decisionId]);
 
   const togglePin = () => {
     if (!sectionId) return;
 
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      const notes: Record<string, UserNote> = stored ? JSON.parse(stored) : {};
-      const note = notes[sectionId] || {
+      const notes = getNotes();
+      const note: UserNote = notes[sectionId] || {
         sectionId,
         text: '',
         updatedAt: Date.now(),
       };
 
       const currentLinks = note.linkedDekaIds || [];
-      if (isPinned) {
+      const willPin = !isPinned;
+
+      if (!willPin) {
         note.linkedDekaIds = currentLinks.filter(id => id !== decisionId);
       } else {
-        note.linkedDekaIds = [...currentLinks, decisionId];
+        note.linkedDekaIds = Array.from(new Set([...currentLinks, decisionId]));
       }
       note.updatedAt = Date.now();
-      notes[sectionId] = note;
 
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
-      setIsPinned(!isPinned);
+      // 0ms instant UI update
+      setIsPinned(willPin);
+
+      // Save locally and sync to database in background
+      saveNote(note, {
+        bookId: bookId || undefined,
+        sectionNumber: cleanSection,
+        title: `มาตรา ${cleanSection}`
+      });
     } catch (e) {
       console.error('Failed to save pin', e);
     }
@@ -96,7 +113,7 @@ export default function PinToSectionButton({ decisionId, lawName, sectionNumber,
         togglePin();
       }}
       className={`transition-colors flex items-center space-x-1 px-3 py-1.5 rounded-full hover:bg-slate-100 ${
-        isPinned ? 'text-law-600 bg-law-50 border border-law-200' : 'text-slate-500 border border-slate-200 hover:text-law-600'
+        isPinned ? 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800' : 'text-slate-500 border border-slate-200 dark:border-slate-700 hover:text-amber-600'
       } ${className}`}
       aria-label={isPinned ? "Unpin from section" : "Pin to section"}
       title={isPinned ? "เอาออกจากตัวบท" : "ปักหมุดเข้าตัวบท"}

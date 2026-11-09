@@ -325,13 +325,28 @@ export async function fetchDecks(): Promise<MemorizationDeck[]> {
   const local = readJson<MemorizationDeck[]>(MEMO_DECKS_KEY, BUILTIN_DECKS);
   
   try {
-    const res = await fetch('/api/memorize?view=decks');
+    const res = await fetch('/api/memorize?view=decks', { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data.decks)) {
-        writeJson(MEMO_DECKS_KEY, data.decks);
+        const customDecks: MemorizationDeck[] = data.decks.map((d: any) => ({
+          id: d.id,
+          name: d.name,
+          description: d.description || '',
+          color: d.color || 'bg-purple-600',
+          sortOrder: typeof d.sortOrder === 'number' ? d.sortOrder : 99,
+          isBuiltin: false
+        }));
+
+        const localCustom = local.filter(d => !d.isBuiltin);
+        const deckMap = new Map<string, MemorizationDeck>();
+        localCustom.forEach(d => deckMap.set(d.id, d));
+        customDecks.forEach(d => deckMap.set(d.id, d));
+
+        const merged = [...BUILTIN_DECKS, ...Array.from(deckMap.values())];
+        writeJson(MEMO_DECKS_KEY, merged);
         notify();
-        return data.decks;
+        return merged;
       }
     }
   } catch (e) {
@@ -549,6 +564,21 @@ export async function markSectionMastery(
   if (item) {
     // Quality 3 for remembered (Good), Quality 1 for unremembered (Again/Weak)
     const updated = await recordReview(item.id, remembered ? 3 : 1, 'recall');
+    // Background sync mastery status to server
+    try {
+      fetch('/api/memorize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'set_mastery',
+          payload: {
+            itemId: item.id,
+            sectionId: item.sectionId,
+            masteryStatus: remembered ? 'mastered' : 'need_review'
+          }
+        })
+      }).catch(() => {});
+    } catch {}
     return updated;
   }
   return undefined;
@@ -608,12 +638,12 @@ export async function saveDeck(deck: Partial<MemorizationDeck> & { name: string 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'save_deck',
-        payload: deck
+        payload: newDeck
       })
     });
     if (res.ok) {
       const data = await res.json();
-      return data.deckId || deckId;
+      return data.deck?.id || deckId;
     }
   } catch (e) {
     // Offline ok

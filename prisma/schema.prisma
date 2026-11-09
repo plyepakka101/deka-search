@@ -103,20 +103,21 @@ model ExamQuestion {
 }
 
 model AdminMemorizeItem {
-  id           String   @id
-  deckId       String
-  sectionId    String
-  title        String
+  id            String   @id
+  deckId        String
+  sectionId     String
+  title         String
   sectionNumber String?
-  bookId       String?
-  repetitions  Int      @default(0)
-  intervalDays Int      @default(1)
-  easeFactor   Float    @default(2.5)
-  streak       Int      @default(0)
-  status       String   @default("new")
-  nextReviewAt String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  bookId        String?
+  repetitions   Int      @default(0)
+  intervalDays  Int      @default(1)
+  easeFactor    Float    @default(2.5)
+  streak        Int      @default(0)
+  status        String   @default("new")
+  masteryStatus String?  // "mastered" | "need_review"
+  nextReviewAt  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@unique([deckId, sectionId])
   @@index([deckId])
@@ -124,16 +125,29 @@ model AdminMemorizeItem {
 }
 
 model AdminImportantSection {
-  id            String   @id
-  bookId        String?
-  sectionNumber String
-  title         String?
-  note          String?
-  isHighlighted Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id             String   @id
+  bookId         String?
+  sectionNumber  String
+  title          String?
+  note           String?
+  isHighlighted  Boolean  @default(true)
+  linkedDekaIds  String?  // JSON Array of strings e.g. ["123/2565"]
+  textHighlights String?  // JSON Array of highlighted snippets
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@index([bookId])
+}
+
+model AdminDeck {
+  id          String   @id
+  name        String
+  description String?
+  color       String?
+  sortOrder   Int      @default(0)
+  isBuiltin   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model AdminBookmark {
@@ -148,5 +162,3 @@ model AdminBookmark {
 
   @@index([decisionYear])
 }
-
-

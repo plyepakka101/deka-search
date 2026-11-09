@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 export interface BookmarkItem {
   id: string;
@@ -12,101 +12,190 @@ export interface BookmarkItem {
 }
 
 const STORAGE_KEY = 'deka_bookmarks';
+const SYNC_CHANNEL_NAME = 'deka_bookmarks_sync';
 
-export function useBookmarks() {
-  const [bookmarks, setBookmarks] = useState<BookmarkItem[]>([]);
-  const [isLoaded, setIsLoaded] = useState(false);
+// Global shared state across all BookmarkButton instances on the page
+let globalBookmarks: BookmarkItem[] = [];
+let globalBookmarkedIdSet = new Set<string>();
+let isGlobalInitialized = false;
+let globalIsAdmin = false;
+let globalFetchPromise: Promise<void> | null = null;
+const listeners = new Set<() => void>();
 
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  // Load from local storage on mount, then sync with server if admin
-  useEffect(() => {
-    let localItems: BookmarkItem[] = [];
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        localItems = JSON.parse(stored);
-        setBookmarks(localItems);
+let broadcastChannel: BroadcastChannel | null = null;
+if (typeof window !== 'undefined') {
+  try {
+    broadcastChannel = new BroadcastChannel(SYNC_CHANNEL_NAME);
+    broadcastChannel.onmessage = (event) => {
+      if (event.data?.type === 'UPDATE_BOOKMARKS' && Array.isArray(event.data.bookmarks)) {
+        updateGlobalState(event.data.bookmarks, false);
       }
-    } catch (e) {
-      console.error('Failed to parse bookmarks', e);
-    } finally {
-      setIsLoaded(true);
-    }
+    };
+  } catch {
+    // BroadcastChannel unsupported fallback
+  }
+}
 
-    // Check with server
-    fetch('/api/bookmarks')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data?.isAdmin) {
-          setIsAdmin(true);
-          if (Array.isArray(data.bookmarks)) {
-            const map = new Map<string, BookmarkItem>();
-            // Server items from DB
-            data.bookmarks.forEach((b: any) => {
-              map.set(b.id, {
-                id: b.id,
-                decisionNumber: b.decisionNumber,
-                decisionYear: b.decisionYear,
-                parties: b.parties,
-                shortSummary: b.shortSummary,
-                timestamp: b.timestamp ? Number(b.timestamp) : Date.now(),
-              });
+function updateGlobalState(items: BookmarkItem[], broadcast = true) {
+  globalBookmarks = items;
+  globalBookmarkedIdSet = new Set(items.map(i => i.id));
+  if (broadcast && broadcastChannel) {
+    try {
+      broadcastChannel.postMessage({ type: 'UPDATE_BOOKMARKS', bookmarks: items });
+    } catch {}
+  }
+  notifyListeners();
+}
+
+function notifyListeners() {
+  listeners.forEach(fn => {
+    try {
+      fn();
+    } catch (e) {
+      console.error('Bookmark listener error:', e);
+    }
+  });
+}
+
+function saveToLocalStorage(items: BookmarkItem[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  } catch (e) {
+    console.error('Failed to save bookmarks to localStorage', e);
+  }
+}
+
+function loadInitialFromLocalStorage(): BookmarkItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+// Single deduplicated server fetcher
+async function fetchServerBookmarks(): Promise<void> {
+  if (globalFetchPromise) return globalFetchPromise;
+
+  globalFetchPromise = (async () => {
+    try {
+      const res = await fetch('/api/bookmarks', { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data?.success) return;
+
+      if (data.isAdmin) {
+        globalIsAdmin = true;
+        if (Array.isArray(data.bookmarks)) {
+          const serverMap = new Map<string, BookmarkItem>();
+          data.bookmarks.forEach((b: any) => {
+            serverMap.set(b.id, {
+              id: b.id,
+              decisionNumber: b.decisionNumber,
+              decisionYear: b.decisionYear ? Number(b.decisionYear) : null,
+              parties: b.parties || null,
+              shortSummary: b.shortSummary || null,
+              timestamp: b.timestamp ? Number(b.timestamp) : Date.now(),
             });
-            // Merge any existing local items
-            localItems.forEach(b => {
-              if (!map.has(b.id)) {
-                map.set(b.id, b);
-              }
-            });
-            const merged = Array.from(map.values());
-            setBookmarks(merged);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+          });
+
+          // Check if there are local-only items created offline before sign-in
+          const offlineNewItems: BookmarkItem[] = [];
+          for (const local of globalBookmarks) {
+            if (!serverMap.has(local.id)) {
+              offlineNewItems.push(local);
+              serverMap.set(local.id, local);
+            }
+          }
+
+          const merged = Array.from(serverMap.values()).sort((a, b) => b.timestamp - a.timestamp);
+          saveToLocalStorage(merged);
+          updateGlobalState(merged, true);
+
+          // Sync any offline items back to DB in the background
+          if (offlineNewItems.length > 0) {
+            fetch('/api/bookmarks', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'sync_all', bookmarks: offlineNewItems })
+            }).catch(() => {});
           }
         }
-      })
-      .catch(() => {});
-  }, []);
-
-  // Save to local storage whenever bookmarks change
-  useEffect(() => {
-    if (!isLoaded) return;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
+      }
     } catch (e) {
-      console.error('Failed to save bookmarks', e);
+      // Offline / network failure -> safe fallback to local cache
     }
-  }, [bookmarks, isLoaded]);
+  })();
+
+  return globalFetchPromise;
+}
+
+export function useBookmarks() {
+  const [, setTick] = useState(0);
+
+  // Initialize global cache on first hook call
+  if (!isGlobalInitialized && typeof window !== 'undefined') {
+    const initial = loadInitialFromLocalStorage();
+    globalBookmarks = initial;
+    globalBookmarkedIdSet = new Set(initial.map(i => i.id));
+    isGlobalInitialized = true;
+  }
+
+  useEffect(() => {
+    const handleUpdate = () => setTick(t => t + 1);
+    listeners.add(handleUpdate);
+
+    // Trigger single background server check if not already running
+    fetchServerBookmarks();
+
+    return () => {
+      listeners.delete(handleUpdate);
+    };
+  }, []);
 
   const addBookmark = (item: Omit<BookmarkItem, 'timestamp'>) => {
     const newItem: BookmarkItem = { ...item, timestamp: Date.now() };
-    setBookmarks(prev => {
-      // Prevent duplicates
-      if (prev.some(b => b.id === item.id)) return prev;
-      return [newItem, ...prev];
-    });
 
-    // Sync to DB if admin (safe no-op for regular users)
+    // 0ms instant optimistic UI update
+    if (!globalBookmarkedIdSet.has(item.id)) {
+      const updated = [newItem, ...globalBookmarks];
+      saveToLocalStorage(updated);
+      updateGlobalState(updated, true);
+    }
+
+    // Background sync to server
     fetch('/api/bookmarks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'add', bookmark: newItem })
-    }).catch(() => {});
+    }).catch((e) => {
+      console.warn('Background bookmark add sync error:', e);
+    });
   };
 
   const removeBookmark = (id: string) => {
-    setBookmarks(prev => prev.filter(b => b.id !== id));
+    // 0ms instant optimistic UI update
+    if (globalBookmarkedIdSet.has(id)) {
+      const updated = globalBookmarks.filter(b => b.id !== id);
+      saveToLocalStorage(updated);
+      updateGlobalState(updated, true);
+    }
 
-    // Sync to DB if admin (safe no-op for regular users)
+    // Background sync to server
     fetch('/api/bookmarks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'remove', bookmark: { id } })
-    }).catch(() => {});
+    }).catch((e) => {
+      console.warn('Background bookmark remove sync error:', e);
+    });
   };
 
   const isBookmarked = (id: string) => {
-    return bookmarks.some(b => b.id === id);
+    return globalBookmarkedIdSet.has(id);
   };
 
   const toggleBookmark = (item: Omit<BookmarkItem, 'timestamp'>) => {
@@ -118,9 +207,9 @@ export function useBookmarks() {
   };
 
   return {
-    bookmarks,
-    isLoaded,
-    isAdmin,
+    bookmarks: globalBookmarks,
+    isLoaded: isGlobalInitialized,
+    isAdmin: globalIsAdmin,
     addBookmark,
     removeBookmark,
     isBookmarked,

@@ -316,11 +316,12 @@ export const saveNote = (note: UserNote, lawInfo?: { sectionNumber?: string; boo
   if (typeof window === 'undefined') return {};
   const notes = getNotes();
   
-  const hasText = note.text && note.text.trim().length > 0;
-  const hasHighlight = note.isHighlighted;
-  const hasTextHighlights = note.textHighlights && note.textHighlights.length > 0;
+  const hasText = Boolean(note.text && note.text.trim().length > 0);
+  const hasHighlight = Boolean(note.isHighlighted);
+  const hasTextHighlights = Boolean(note.textHighlights && note.textHighlights.length > 0);
+  const hasLinkedDekas = Boolean(note.linkedDekaIds && note.linkedDekaIds.length > 0);
 
-  if (!hasText && !hasHighlight && !hasTextHighlights) {
+  if (!hasText && !hasHighlight && !hasTextHighlights && !hasLinkedDekas) {
     delete notes[note.sectionId];
   } else {
     notes[note.sectionId] = note;
@@ -338,8 +339,10 @@ export const saveNote = (note: UserNote, lawInfo?: { sectionNumber?: string; boo
         sectionNumber: lawInfo?.sectionNumber,
         title: lawInfo?.title,
         note: note.text,
-        isHighlighted: Boolean(note.isHighlighted),
-        action: note.isHighlighted ? 'upsert' : 'delete'
+        isHighlighted: hasHighlight,
+        linkedDekaIds: note.linkedDekaIds || [],
+        textHighlights: note.textHighlights || [],
+        action: (hasText || hasHighlight || hasTextHighlights || hasLinkedDekas) ? 'upsert' : 'delete'
       })
     }).catch(() => {});
   } catch (e) {
@@ -352,31 +355,54 @@ export const saveNote = (note: UserNote, lawInfo?: { sectionNumber?: string; boo
 export const syncAdminImportantSections = async () => {
   if (typeof window === 'undefined') return;
   try {
-    const res = await fetch('/api/laws/important-sections');
+    const res = await fetch('/api/laws/important-sections', { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
       if (data.isAdmin && Array.isArray(data.sections)) {
         const notes = getNotes();
         let changed = false;
         for (const sec of data.sections) {
-          if (!notes[sec.id]) {
+          const existing = notes[sec.id];
+          if (!existing) {
             notes[sec.id] = {
               sectionId: sec.id,
               text: sec.note || '',
               updatedAt: Date.now(),
-              isHighlighted: true
+              isHighlighted: Boolean(sec.isHighlighted),
+              linkedDekaIds: sec.linkedDekaIds || [],
+              textHighlights: sec.textHighlights || []
             };
             changed = true;
-          } else if (!notes[sec.id].isHighlighted) {
-            notes[sec.id].isHighlighted = true;
-            if (sec.note && !notes[sec.id].text) {
-              notes[sec.id].text = sec.note;
+          } else {
+            let noteChanged = false;
+            if (sec.isHighlighted !== undefined && existing.isHighlighted !== sec.isHighlighted) {
+              existing.isHighlighted = sec.isHighlighted;
+              noteChanged = true;
             }
-            changed = true;
+            if (sec.note && existing.text !== sec.note) {
+              existing.text = sec.note;
+              noteChanged = true;
+            }
+            if (Array.isArray(sec.linkedDekaIds) && sec.linkedDekaIds.length > 0) {
+              const currentDekas = existing.linkedDekaIds || [];
+              const mergedDekas = Array.from(new Set([...currentDekas, ...sec.linkedDekaIds]));
+              if (mergedDekas.length !== currentDekas.length) {
+                existing.linkedDekaIds = mergedDekas;
+                noteChanged = true;
+              }
+            }
+            if (Array.isArray(sec.textHighlights) && sec.textHighlights.length > 0) {
+              existing.textHighlights = sec.textHighlights;
+              noteChanged = true;
+            }
+            if (noteChanged) {
+              changed = true;
+            }
           }
         }
         if (changed) {
           localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+          window.dispatchEvent(new CustomEvent('laws-notes-updated'));
         }
       }
     }
