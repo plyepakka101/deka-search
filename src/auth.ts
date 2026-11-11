@@ -1,10 +1,20 @@
 import NextAuth from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 
-export const DEFAULT_ADMIN_EMAILS = [
-  'pramot.thamwi@gmail.com',
-  'plyepakka@gmail.com',
-];
+declare module 'next-auth' {
+  interface Session {
+    user: {
+      id?: string;
+      name?: string | null;
+      email?: string | null;
+      image?: string | null;
+      isAdmin?: boolean;
+    };
+  }
+}
+
+// Deprecated: Kept for backward compatibility; configure admins via ADMIN_EMAILS environment variable
+export const DEFAULT_ADMIN_EMAILS: string[] = [];
 
 export function getAdminEmails(): string[] {
   const raw = (process.env.ADMIN_EMAILS || '').trim();
@@ -25,7 +35,7 @@ export function getAdminEmails(): string[] {
       .filter(Boolean);
   }
 
-  return Array.from(new Set([...DEFAULT_ADMIN_EMAILS.map(e => e.toLowerCase()), ...list]));
+  return Array.from(new Set(list));
 }
 
 export const ADMIN_EMAILS = getAdminEmails();
@@ -52,8 +62,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     session({ session, token }) {
       if (session.user) {
-        // @ts-ignore
-        session.user.isAdmin = token.isAdmin;
+        session.user.isAdmin = Boolean(token.isAdmin);
       }
       return session;
     },
