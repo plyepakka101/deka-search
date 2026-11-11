@@ -3,10 +3,12 @@ import { prisma } from '@/lib/prisma';
 import { parseExamText, ParsedExamQuestion } from '@/utils/examParser';
 import { auth } from '@/auth';
 
+const MAX_EXAM_RAW_TEXT = 5 * 1024 * 1024; // 5MB
+const MAX_QUESTIONS_PER_BATCH = 200;
+
 export async function POST(request: Request) {
   try {
     const session = await auth();
-    // @ts-ignore
     if (!session?.user?.isAdmin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -16,8 +18,12 @@ export async function POST(request: Request) {
 
     // 1. ACTION: PREVIEW
     if (action === 'preview') {
-      if (!rawText || !rawText.trim()) {
+      if (!rawText || typeof rawText !== 'string' || !rawText.trim()) {
         return NextResponse.json({ error: 'กรุณากรอกหรืออัปโหลดข้อความข้อสอบ' }, { status: 400 });
+      }
+
+      if (rawText.length > MAX_EXAM_RAW_TEXT) {
+        return NextResponse.json({ error: 'ข้อความข้อสอบมีขนาดยาวเกินไป (จำกัดไม่เกิน 5MB)' }, { status: 413 });
       }
 
       const parsed = parseExamText(rawText, category || 'พระราชบัญญัติล้มละลาย พ.ศ. 2483', title || '');
@@ -78,6 +84,10 @@ export async function POST(request: Request) {
     if (action === 'save') {
       if (!title || !category || !Array.isArray(questions) || questions.length === 0) {
         return NextResponse.json({ error: 'ข้อมูลชุดข้อสอบไม่ครบถ้วน' }, { status: 400 });
+      }
+
+      if (questions.length > MAX_QUESTIONS_PER_BATCH) {
+        return NextResponse.json({ error: `จำนวนข้อสอบเกินขีดจำกัด (ไม่เกิน ${MAX_QUESTIONS_PER_BATCH} ข้อต่อชุด)` }, { status: 400 });
       }
 
       const newCollection = await prisma.examCollection.create({

@@ -4,19 +4,26 @@ import { prisma } from "@/lib/prisma";
 import { thaiToArabic } from "@/components/law-mate/utils/textUtils";
 import { auth } from "@/auth";
 
+const MAX_HTML_SIZE = 15 * 1024 * 1024; // 15MB
+
 export async function POST(req: Request) {
   try {
     const session = await auth();
-    // @ts-ignore
     if (!session || !session.user?.isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { htmlContent, fileName } = await req.json();
 
-    if (!htmlContent) {
-      return NextResponse.json({ error: "No HTML content provided" }, { status: 400 });
+    if (!htmlContent || typeof htmlContent !== 'string') {
+      return NextResponse.json({ error: "กรุณาระบุเนื้อหา HTML ของคำพิพากษา" }, { status: 400 });
     }
+
+    if (htmlContent.length > MAX_HTML_SIZE) {
+      return NextResponse.json({ error: "ไฟล์ HTML มีขนาดใหญ่เกินไป (จำกัดไม่เกิน 15MB เพื่อความเสถียรของระบบ)" }, { status: 413 });
+    }
+
+    const safeFileName = typeof fileName === 'string' && fileName.trim() ? fileName.trim().slice(0, 255) : "Unknown File";
 
     const $ = cheerio.load(htmlContent);
     const textContent = $("body").text().replace(/\s+/g, ' '); // simple fallback text
@@ -37,7 +44,7 @@ export async function POST(req: Request) {
     // Create an import batch to track this session
     const importBatch = await prisma.importBatch.create({
       data: {
-        fileName: fileName || "Unknown File",
+        fileName: safeFileName,
       }
     });
 
