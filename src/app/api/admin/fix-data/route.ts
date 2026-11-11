@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 
 // Helper to convert arabic digits to thai digits
 const arabicToThai = (text: string): string => {
@@ -12,6 +13,12 @@ const arabicToThai = (text: string): string => {
 
 export async function POST(req: Request) {
   try {
+    const session = await auth();
+    // @ts-ignore
+    if (!session?.user?.isAdmin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await req.json();
     const { action, find, replace, lawFilter, decisionNumber, targetIds } = body;
 

@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { parseExamText, ParsedExamQuestion } from '@/utils/examParser';
+import { auth } from '@/auth';
 
 export async function POST(request: Request) {
   try {
+    const session = await auth();
+    // @ts-ignore
+    if (!session?.user?.isAdmin) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { action, rawText, category, title, year, description, source, questions } = body;
 
