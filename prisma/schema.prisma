@@ -156,7 +156,9 @@ model AdminBookmark {
   decisionYear   Int?
   parties        String?
   shortSummary   String?
-  timestamp      Int?
+  // epoch milliseconds (Date.now() ~ 1.7e12 overflows 32-bit Int) -> BigInt.
+  // The Turso column is already INTEGER (64-bit), so no SQL migration is needed.
+  timestamp      BigInt?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

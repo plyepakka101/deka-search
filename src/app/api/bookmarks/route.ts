@@ -2,149 +2,214 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 
+const MAX_BULK = 2000;
+const CHUNK_SIZE = 100;
+
+interface NormalizedBookmark {
+  id: string;
+  decisionNumber: string;
+  decisionYear: number | null;
+  parties: string | null;
+  shortSummary: string | null;
+  timestamp: bigint | null;
+}
+
+function toIntOrNull(v: unknown): number | null {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.trunc(n) : null;
+}
+
+function toBigIntOrNull(v: unknown): bigint | null {
+  const n = toIntOrNull(v);
+  return n === null ? null : BigInt(n);
+}
+
+function toStrOrNull(v: unknown): string | null {
+  return typeof v === 'string' && v.length > 0 ? v : null;
+}
+
+function normalize(input: unknown): NormalizedBookmark | null {
+  if (!input || typeof input !== 'object') return null;
+  const raw = input as Record<string, unknown>;
+  if (typeof raw.id !== 'string' || !raw.id) return null;
+  if (typeof raw.decisionNumber !== 'string' || !raw.decisionNumber) return null;
+  return {
+    id: raw.id,
+    decisionNumber: raw.decisionNumber,
+    decisionYear: toIntOrNull(raw.decisionYear),
+    parties: toStrOrNull(raw.parties),
+    shortSummary: toStrOrNull(raw.shortSummary),
+    timestamp: toBigIntOrNull(raw.timestamp),
+  };
+}
+
+interface RequestBody {
+  action?: unknown;
+  bookmark?: unknown;
+  bookmarks?: unknown;
+  upserts?: unknown;
+  removes?: unknown;
+}
+
+// BigInt can't be JSON-serialised, so always convert rows before responding.
+function serialize(row: {
+  id: string;
+  decisionNumber: string;
+  decisionYear: number | null;
+  parties: string | null;
+  shortSummary: string | null;
+  timestamp: bigint | null;
+}) {
+  return {
+    id: row.id,
+    decisionNumber: row.decisionNumber,
+    decisionYear: row.decisionYear,
+    parties: row.parties,
+    shortSummary: row.shortSummary,
+    timestamp: row.timestamp === null ? null : Number(row.timestamp),
+  };
+}
+
+function upsertOp(b: NormalizedBookmark) {
+  const { id, ...data } = b;
+  return prisma.adminBookmark.upsert({
+    where: { id },
+    update: { ...data, updatedAt: new Date() },
+    create: { id, ...data },
+  });
+}
+
+function errorResponse(error: unknown, fallback: string) {
+  const message = error instanceof Error && error.message ? error.message : fallback;
+  console.error('[api/bookmarks]', error);
+  return NextResponse.json({ success: false, error: message }, { status: 500 });
+}
+
 export async function GET() {
   try {
     const session = await auth();
-    const isAdmin = Boolean((session?.user as any)?.isAdmin);
+    const isAdmin = Boolean(session?.user?.isAdmin);
 
-    const bookmarks = await prisma.adminBookmark.findMany({
-      orderBy: [
-        { decisionYear: 'asc' },
-        { decisionNumber: 'asc' }
-      ]
+    // Admin bookmarks are private to admins; everyone else only uses local storage.
+    if (!isAdmin) {
+      return NextResponse.json({ success: true, isAdmin: false, bookmarks: [] });
+    }
+
+    const rows = await prisma.adminBookmark.findMany({
+      orderBy: [{ decisionYear: 'asc' }, { decisionNumber: 'asc' }],
     });
 
     return NextResponse.json({
       success: true,
-      isAdmin,
-      bookmarks,
+      isAdmin: true,
+      bookmarks: rows.map(serialize),
     });
-  } catch (error: any) {
-    console.error('Failed to fetch bookmarks:', error);
-    return NextResponse.json({
-      success: false,
-      error: error.message || 'Failed to fetch bookmarks',
-      bookmarks: [],
-    }, { status: 500 });
+  } catch (error) {
+    return errorResponse(error, 'Failed to fetch bookmarks');
   }
 }
 
 export async function POST(request: Request) {
   try {
     const session = await auth();
-    const isAdmin = Boolean((session?.user as any)?.isAdmin);
-    const body = await request.json();
-    const { action, bookmark, bookmarks: bulkBookmarks } = body;
+    const isAdmin = Boolean(session?.user?.isAdmin);
+
+    let body: RequestBody;
+    try {
+      body = ((await request.json()) ?? {}) as RequestBody;
+    } catch {
+      return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
+    }
+    const { action, bookmark } = body;
 
     if (!isAdmin) {
       return NextResponse.json({
         success: true,
         savedToDb: false,
-        message: 'ผู้ใช้ทั่วไป: บันทึกบุคมาร์คในอุปกรณ์นี้เรียบร้อย (ย้ายเครื่องได้ผ่านการส่งออกข้อมูล)',
+        message: 'ผู้ใช้ทั่วไป: บันทึกบุ๊กมาร์กในอุปกรณ์นี้เท่านั้น (เข้าสู่ระบบแอดมินเพื่อซิงค์ข้ามเครื่อง)',
       });
     }
 
-    // Bulk sync
-    if (action === 'sync_all' && Array.isArray(bulkBookmarks)) {
-      for (const b of bulkBookmarks) {
-        if (!b.id) continue;
-        await prisma.adminBookmark.upsert({
-          where: { id: b.id },
-          update: {
-            decisionNumber: b.decisionNumber,
-            decisionYear: b.decisionYear ? Number(b.decisionYear) : null,
-            parties: b.parties || null,
-            shortSummary: b.shortSummary || null,
-            timestamp: b.timestamp ? Number(b.timestamp) : null,
-            updatedAt: new Date(),
-          },
-          create: {
-            id: b.id,
-            decisionNumber: b.decisionNumber,
-            decisionYear: b.decisionYear ? Number(b.decisionYear) : null,
-            parties: b.parties || null,
-            shortSummary: b.shortSummary || null,
-            timestamp: b.timestamp ? Number(b.timestamp) : null,
-          }
-        });
+    // Bulk sync: upserts + removals in one request. 'sync_all' is the legacy name.
+    if (action === 'sync_ops' || action === 'sync_all') {
+      const rawUpserts: unknown[] = Array.isArray(body.upserts)
+        ? body.upserts
+        : Array.isArray(body.bookmarks)
+          ? body.bookmarks
+          : [];
+      const rawRemoves: unknown[] = Array.isArray(body.removes) ? body.removes : [];
+
+      if (rawUpserts.length > MAX_BULK || rawRemoves.length > MAX_BULK) {
+        return NextResponse.json({ success: false, error: 'Too many bookmarks in one request' }, { status: 413 });
+      }
+
+      const upserts = rawUpserts.map(normalize).filter((b): b is NormalizedBookmark => b !== null);
+      const removes = rawRemoves.filter((id): id is string => typeof id === 'string' && id.length > 0);
+
+      if (removes.length > 0) {
+        await prisma.adminBookmark.deleteMany({ where: { id: { in: removes } } });
+      }
+      for (let i = 0; i < upserts.length; i += CHUNK_SIZE) {
+        await prisma.$transaction(upserts.slice(i, i + CHUNK_SIZE).map(upsertOp));
       }
 
       return NextResponse.json({
         success: true,
         savedToDb: true,
-        message: 'แอดมิน: ซิงค์บุคมาร์คทั้งหมดลงฐานข้อมูลเรียบร้อย',
+        upserted: upserts.length,
+        removed: removes.length,
+        message: 'แอดมิน: ซิงค์บุ๊กมาร์กลงฐานข้อมูลเรียบร้อย',
       });
     }
 
     if (action === 'remove') {
-      if (bookmark?.id) {
-        await prisma.adminBookmark.deleteMany({
-          where: { id: bookmark.id },
-        });
+      const removeId = (bookmark as { id?: unknown } | null | undefined)?.id;
+      if (typeof removeId === 'string' && removeId) {
+        await prisma.adminBookmark.deleteMany({ where: { id: removeId } });
       }
       return NextResponse.json({
         success: true,
         savedToDb: true,
-        message: 'แอดมิน: ลบบุคมาร์คออกจากฐานข้อมูลเรียบร้อย',
+        message: 'แอดมิน: ลบบุ๊กมาร์กออกจากฐานข้อมูลเรียบร้อย',
       });
     }
 
     if (action === 'add' || action === 'toggle') {
-      if (!bookmark?.id) {
-        return NextResponse.json({ success: false, error: 'Missing bookmark.id' }, { status: 400 });
+      const normalized = normalize(bookmark);
+      if (!normalized) {
+        return NextResponse.json(
+          { success: false, error: 'Missing or invalid bookmark (id, decisionNumber required)' },
+          { status: 400 },
+        );
       }
 
-      const existing = await prisma.adminBookmark.findUnique({
-        where: { id: bookmark.id }
-      });
-
-      if (action === 'toggle' && existing) {
-        await prisma.adminBookmark.delete({
-          where: { id: bookmark.id }
-        });
-        return NextResponse.json({
-          success: true,
-          savedToDb: true,
-          isBookmarked: false,
-          message: 'แอดมิน: ลบบุคมาร์คออกจากฐานข้อมูลเรียบร้อย',
-        });
-      }
-
-      const saved = await prisma.adminBookmark.upsert({
-        where: { id: bookmark.id },
-        update: {
-          decisionNumber: bookmark.decisionNumber,
-          decisionYear: bookmark.decisionYear ? Number(bookmark.decisionYear) : null,
-          parties: bookmark.parties || null,
-          shortSummary: bookmark.shortSummary || null,
-          timestamp: bookmark.timestamp ? Number(bookmark.timestamp) : null,
-          updatedAt: new Date(),
-        },
-        create: {
-          id: bookmark.id,
-          decisionNumber: bookmark.decisionNumber,
-          decisionYear: bookmark.decisionYear ? Number(bookmark.decisionYear) : null,
-          parties: bookmark.parties || null,
-          shortSummary: bookmark.shortSummary || null,
-          timestamp: bookmark.timestamp ? Number(bookmark.timestamp) : null,
+      if (action === 'toggle') {
+        const existing = await prisma.adminBookmark.findUnique({ where: { id: normalized.id } });
+        if (existing) {
+          await prisma.adminBookmark.delete({ where: { id: normalized.id } });
+          return NextResponse.json({
+            success: true,
+            savedToDb: true,
+            isBookmarked: false,
+            message: 'แอดมิน: ลบบุ๊กมาร์กออกจากฐานข้อมูลเรียบร้อย',
+          });
         }
-      });
+      }
+
+      const saved = await upsertOp(normalized);
 
       return NextResponse.json({
         success: true,
         savedToDb: true,
         isBookmarked: true,
-        bookmark: saved,
-        message: 'แอดมิน: บันทึกบุคมาร์คลงฐานข้อมูลเรียบร้อย (ซิงค์ใช้งานได้ทุกเครื่อง)',
+        bookmark: serialize(saved),
+        message: 'แอดมิน: บันทึกบุ๊กมาร์กลงฐานข้อมูลเรียบร้อย (ซิงค์ใช้งานได้ทุกเครื่อง)',
       });
     }
 
     return NextResponse.json({ success: false, error: 'Unknown action' }, { status: 400 });
-  } catch (error: any) {
-    console.error('Failed to handle bookmark request:', error);
-    return NextResponse.json({
-      success: false,
-      error: error.message || 'Internal Server Error',
-    }, { status: 500 });
+  } catch (error) {
+    return errorResponse(error, 'Internal Server Error');
   }
 }

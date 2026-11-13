@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { Bookmark, Star, Scale, BookOpen, ChevronRight, Search, Trash2, ExternalLink } from "lucide-react";
+import { Bookmark, Star, Scale, BookOpen, ChevronRight, Search, Trash2, ExternalLink, CloudOff, Cloud, RefreshCw } from "lucide-react";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import BookmarkButton from "@/components/BookmarkButton";
 import {
@@ -17,8 +17,11 @@ import { LawSection, UserNote, LawBook } from "@/components/law-mate/types";
 import { sortSectionsAscending } from "@/utils/sectionSort";
 
 export default function BookmarksPage() {
-  const { bookmarks, isLoaded } = useBookmarks();
+  const { bookmarks, isLoaded, syncStatus, syncMessage, retrySync } = useBookmarks();
   const [activeTab, setActiveTab] = useState<"deka" | "laws">("deka");
+  // On a fresh device the local list is empty until the first server fetch finishes
+  const isDekaLoading =
+    !isLoaded || (bookmarks.length === 0 && (syncStatus === "idle" || syncStatus === "syncing"));
 
   // Important sections state
   const [importantLaws, setImportantLaws] = useState<LawSection[]>([]);
@@ -156,7 +159,43 @@ export default function BookmarksPage() {
       {/* Tab 1: Deka Bookmarks */}
       {activeTab === "deka" && (
         <section className="space-y-4 animate-in fade-in duration-200">
-          {!isLoaded ? (
+          {/* Sync status */}
+          {syncStatus === "synced" && (
+            <div className="flex items-center gap-2 px-1 text-xs text-emerald-700 dark:text-emerald-400">
+              <Cloud className="w-3.5 h-3.5" />
+              <span>ซิงค์กับเซิร์ฟเวอร์แล้ว — ใช้ได้ทุกเครื่องที่เข้าสู่ระบบแอดมิน</span>
+            </div>
+          )}
+          {syncStatus === "local-only" && (
+            <div className="flex items-start gap-3 p-4 rounded-2xl border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 text-sm">
+              <CloudOff className="w-4 h-4 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-semibold">บุ๊กมาร์กเก็บในเครื่องนี้เท่านั้น</p>
+                <p className="text-xs mt-0.5 opacity-90">
+                  ต้องเข้าสู่ระบบด้วยบัญชีแอดมิน (อีเมลต้องอยู่ใน ADMIN_EMAILS ของ Vercel) จึงจะซิงค์ข้ามเครื่องได้
+                </p>
+              </div>
+            </div>
+          )}
+          {syncStatus === "error" && (
+            <div className="flex items-start gap-3 p-4 rounded-2xl border border-rose-200 dark:border-rose-800/60 bg-rose-50 dark:bg-rose-950/30 text-rose-900 dark:text-rose-200 text-sm">
+              <CloudOff className="w-4 h-4 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold">ซิงค์กับเซิร์ฟเวอร์ไม่สำเร็จ</p>
+                {syncMessage && <p className="text-xs mt-0.5 opacity-90 break-words">{syncMessage}</p>}
+                <p className="text-xs mt-0.5 opacity-90">ข้อมูลยังอยู่ในเครื่องนี้ และจะลองซิงค์ใหม่ให้อัตโนมัติ</p>
+              </div>
+              <button
+                onClick={() => void retrySync()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors cursor-pointer shrink-0"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                ลองอีกครั้ง
+              </button>
+            </div>
+          )}
+
+          {isDekaLoading ? (
             <div className="flex justify-center p-12">
               <div className="h-8 w-8 animate-spin rounded-full border-t-2 border-b-2 border-indigo-600"></div>
             </div>
