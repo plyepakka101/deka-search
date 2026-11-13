@@ -156,9 +156,10 @@ model AdminBookmark {
   decisionYear   Int?
   parties        String?
   shortSummary   String?
-  // epoch milliseconds (Date.now() ~ 1.7e12 overflows 32-bit Int) -> BigInt.
-  // The Turso column is already INTEGER (64-bit), so no SQL migration is needed.
-  timestamp      BigInt?
+  // epoch milliseconds. Float (double) reads both `1793774741340` and `1793774741340.0`
+  // as returned by the libsql adapter (BigInt rejects the latter) and is exact up to 2^53.
+  // The Turso column is already INTEGER, so no SQL migration is needed.
+  timestamp      Float?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

@@ -11,18 +11,13 @@ interface NormalizedBookmark {
   decisionYear: number | null;
   parties: string | null;
   shortSummary: string | null;
-  timestamp: bigint | null;
+  timestamp: number | null;
 }
 
 function toIntOrNull(v: unknown): number | null {
   if (v === null || v === undefined || v === '') return null;
   const n = Number(v);
   return Number.isFinite(n) ? Math.trunc(n) : null;
-}
-
-function toBigIntOrNull(v: unknown): bigint | null {
-  const n = toIntOrNull(v);
-  return n === null ? null : BigInt(n);
 }
 
 function toStrOrNull(v: unknown): string | null {
@@ -40,7 +35,7 @@ function normalize(input: unknown): NormalizedBookmark | null {
     decisionYear: toIntOrNull(raw.decisionYear),
     parties: toStrOrNull(raw.parties),
     shortSummary: toStrOrNull(raw.shortSummary),
-    timestamp: toBigIntOrNull(raw.timestamp),
+    timestamp: toIntOrNull(raw.timestamp),
   };
 }
 
@@ -52,14 +47,14 @@ interface RequestBody {
   removes?: unknown;
 }
 
-// BigInt can't be JSON-serialised, so always convert rows before responding.
+// Only expose the fields the client needs (and always plain numbers).
 function serialize(row: {
   id: string;
   decisionNumber: string;
   decisionYear: number | null;
   parties: string | null;
   shortSummary: string | null;
-  timestamp: bigint | null;
+  timestamp: number | null;
 }) {
   return {
     id: row.id,
