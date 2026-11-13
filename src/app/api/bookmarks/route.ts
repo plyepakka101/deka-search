@@ -47,22 +47,26 @@ interface RequestBody {
   removes?: unknown;
 }
 
-// Only expose the fields the client needs (and always plain numbers).
-function serialize(row: {
+// The libsql adapter types every INTEGER column as Int32, so reading `timestamp` (epoch ms)
+// through a model query throws "number must be an integer in column 'timestamp'".
+// Read via raw SQL with CAST(... AS TEXT) instead (typed as text -> always safe).
+interface RawBookmarkRow {
   id: string;
   decisionNumber: string;
-  decisionYear: number | null;
+  decisionYear: string | number | null;
   parties: string | null;
   shortSummary: string | null;
-  timestamp: number | null;
-}) {
+  timestamp: string | number | null;
+}
+
+function fromRawRow(row: RawBookmarkRow) {
   return {
     id: row.id,
     decisionNumber: row.decisionNumber,
-    decisionYear: row.decisionYear,
+    decisionYear: toIntOrNull(row.decisionYear),
     parties: row.parties,
     shortSummary: row.shortSummary,
-    timestamp: row.timestamp === null ? null : Number(row.timestamp),
+    timestamp: toIntOrNull(row.timestamp),
   };
 }
 
@@ -72,6 +76,7 @@ function upsertOp(b: NormalizedBookmark) {
     where: { id },
     update: { ...data, updatedAt: new Date() },
     create: { id, ...data },
+    select: { id: true }, // never read `timestamp` back (see note above)
   });
 }
 
@@ -91,14 +96,18 @@ export async function GET() {
       return NextResponse.json({ success: true, isAdmin: false, bookmarks: [] });
     }
 
-    const rows = await prisma.adminBookmark.findMany({
-      orderBy: [{ decisionYear: 'asc' }, { decisionNumber: 'asc' }],
-    });
+    const rows = await prisma.$queryRaw<RawBookmarkRow[]>`
+      SELECT "id", "decisionNumber",
+             CAST("decisionYear" AS TEXT) AS "decisionYear",
+             "parties", "shortSummary",
+             CAST("timestamp" AS TEXT) AS "timestamp"
+      FROM "AdminBookmark"
+      ORDER BY "decisionYear" ASC, "decisionNumber" ASC`;
 
     return NextResponse.json({
       success: true,
       isAdmin: true,
-      bookmarks: rows.map(serialize),
+      bookmarks: rows.map(fromRawRow),
     });
   } catch (error) {
     return errorResponse(error, 'Failed to fetch bookmarks');
@@ -180,7 +189,10 @@ export async function POST(request: Request) {
       }
 
       if (action === 'toggle') {
-        const existing = await prisma.adminBookmark.findUnique({ where: { id: normalized.id } });
+        const existing = await prisma.adminBookmark.findUnique({
+          where: { id: normalized.id },
+          select: { id: true },
+        });
         if (existing) {
           await prisma.adminBookmark.delete({ where: { id: normalized.id } });
           return NextResponse.json({
@@ -192,13 +204,13 @@ export async function POST(request: Request) {
         }
       }
 
-      const saved = await upsertOp(normalized);
+      await upsertOp(normalized);
 
       return NextResponse.json({
         success: true,
         savedToDb: true,
         isBookmarked: true,
-        bookmark: serialize(saved),
+        bookmark: { ...normalized },
         message: 'แอดมิน: บันทึกบุ๊กมาร์กลงฐานข้อมูลเรียบร้อย (ซิงค์ใช้งานได้ทุกเครื่อง)',
       });
     }

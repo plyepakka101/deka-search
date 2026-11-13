@@ -156,10 +156,11 @@ model AdminBookmark {
   decisionYear   Int?
   parties        String?
   shortSummary   String?
-  // epoch milliseconds. Float (double) reads both `1793774741340` and `1793774741340.0`
-  // as returned by the libsql adapter (BigInt rejects the latter) and is exact up to 2^53.
-  // The Turso column is already INTEGER, so no SQL migration is needed.
-  timestamp      Float?
+  // epoch milliseconds. NOTE: the libsql adapter types every INTEGER column as Int32, so
+  // reading this column through a Prisma model query fails for ms timestamps. Always read
+  // it with a raw query + CAST(... AS TEXT) and never return it from model queries
+  // (use `select: { id: true }`). See src/app/api/bookmarks/route.ts.
+  timestamp      Int?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
