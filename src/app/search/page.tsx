@@ -445,7 +445,8 @@ export default async function SearchPage({
                         decisionNumber: decision.decisionNumber,
                         decisionYear: decision.decisionYear,
                         parties: decision.parties,
-                        shortSummary: decision.shortSummary
+                        shortSummary: decision.shortSummary,
+                        law: decision.law
                       }} />
                     </div>
                   </div>
@@ -515,7 +516,8 @@ export default async function SearchPage({
                     decisionNumber: decision.decisionNumber,
                     decisionYear: decision.decisionYear,
                     parties: decision.parties,
-                    shortSummary: decision.shortSummary
+                    shortSummary: decision.shortSummary,
+                    law: decision.law
                   }} />
                 </div>
                 

@@ -18,6 +18,85 @@ export const LAW_MAP: Record<string, string> = {
   'อาชญา': 'กฎหมายลักษณะอาญา',
 };
 
+export const REVERSE_LAW_MAP: Record<string, string> = {
+  'ประมวลกฎหมายอาญา': 'ป.อ.',
+  'ประมวลกฎหมายแพ่งและพาณิชย์': 'ป.พ.พ.',
+  'ประมวลกฎหมายวิธีพิจารณาความแพ่ง': 'ป.วิ.พ.',
+  'ประมวลกฎหมายวิธีพิจารณาความอาญา': 'ป.วิ.อ.',
+  'ประมวลรัษฎากร': 'ป.รัษฎากร',
+  'ประมวลกฎหมายที่ดิน': 'ป.ที่ดิน',
+  'ประมวลกฎหมายยาเสพติด': 'ป.ยาเสพติด',
+  'พระราชบัญญัติล้มละลาย': 'พ.ร.บ.ล้มละลาย',
+  'พระราชบัญญัติจราจรทางบก พ.ศ. 2522': 'พ.ร.บ.จราจรทางบก',
+  'พระราชบัญญัติจราจรทางบก': 'พ.ร.บ.จราจรทางบก',
+  'กฎหมายลักษณะอาญา': 'อาชญา',
+  'รัฐธรรมนูญแห่งราชอาณาจักรไทย': 'รธน.',
+  'พระธรรมนูญศาลยุติธรรม': 'พระธรรมนูญ',
+};
+
+export interface DekaLawItem {
+  lawKey: string;           // Normalized identifier for grouping
+  lawName: string;          // Full Thai name, e.g. "ประมวลกฎหมายแพ่งและพาณิชย์"
+  shortName: string;        // Short abbreviation, e.g. "ป.พ.พ."
+  sections: string[];       // Array of section strings, e.g. ["856", "860"]
+}
+
+export function extractDekaLaws(lawStr?: string | null): DekaLawItem[] {
+  if (!lawStr || !lawStr.trim()) {
+    return [{
+      lawKey: 'unspecified',
+      lawName: 'ไม่ระบุกฎหมาย',
+      shortName: 'ไม่ระบุ',
+      sections: []
+    }];
+  }
+
+  const rawTokens = lawStr.split(lawSplitRegex);
+  const mapByLawKey = new Map<string, DekaLawItem>();
+
+  for (let token of rawTokens) {
+    token = token.trim();
+    if (!token) continue;
+
+    const parts = token.split(/(?:ม\.|มาตรา)\s*/);
+    const rawLawName = parts[0]?.trim();
+    if (!rawLawName) continue;
+
+    const sections = parts.slice(1).flatMap(p => extractSectionsFromPart(p));
+    const normalized = normalizeLawName(rawLawName);
+    const mappedName = LAW_MAP[rawLawName] || LAW_MAP[normalized] || rawLawName.replace(/,.*$/, '').trim();
+    const shortName = REVERSE_LAW_MAP[mappedName] || rawLawName;
+    const lawKey = mappedName || normalized || rawLawName;
+
+    const existing = mapByLawKey.get(lawKey);
+    if (existing) {
+      for (const sec of sections) {
+        if (!existing.sections.includes(sec)) {
+          existing.sections.push(sec);
+        }
+      }
+    } else {
+      mapByLawKey.set(lawKey, {
+        lawKey,
+        lawName: mappedName,
+        shortName,
+        sections
+      });
+    }
+  }
+
+  if (mapByLawKey.size === 0) {
+    return [{
+      lawKey: 'unspecified',
+      lawName: 'ไม่ระบุกฎหมาย',
+      shortName: 'ไม่ระบุ',
+      sections: []
+    }];
+  }
+
+  return Array.from(mapByLawKey.values());
+}
+
 export interface ParsedLaw {
   lawName: string;
   mappedName: string;

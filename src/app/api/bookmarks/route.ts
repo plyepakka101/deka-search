@@ -11,6 +11,7 @@ interface NormalizedBookmark {
   decisionYear: number | null;
   parties: string | null;
   shortSummary: string | null;
+  law: string | null;
   timestamp: number | null;
 }
 
@@ -35,6 +36,7 @@ function normalize(input: unknown): NormalizedBookmark | null {
     decisionYear: toIntOrNull(raw.decisionYear),
     parties: toStrOrNull(raw.parties),
     shortSummary: toStrOrNull(raw.shortSummary),
+    law: toStrOrNull(raw.law),
     timestamp: toIntOrNull(raw.timestamp),
   };
 }
@@ -56,6 +58,7 @@ interface RawBookmarkRow {
   decisionYear: string | number | null;
   parties: string | null;
   shortSummary: string | null;
+  law: string | null;
   timestamp: string | number | null;
 }
 
@@ -66,6 +69,7 @@ function fromRawRow(row: RawBookmarkRow) {
     decisionYear: toIntOrNull(row.decisionYear),
     parties: row.parties,
     shortSummary: row.shortSummary,
+    law: row.law || null,
     timestamp: toIntOrNull(row.timestamp),
   };
 }
@@ -78,6 +82,20 @@ function upsertOp(b: NormalizedBookmark) {
     create: { id, ...data },
     select: { id: true }, // never read `timestamp` back (see note above)
   });
+}
+
+async function resolveLawIfMissing(b: NormalizedBookmark): Promise<NormalizedBookmark> {
+  if (b.law) return b;
+  try {
+    const found = await prisma.decision.findUnique({
+      where: { id: b.id },
+      select: { law: true }
+    });
+    if (found?.law) {
+      return { ...b, law: found.law };
+    }
+  } catch {}
+  return b;
 }
 
 function errorResponse(error: unknown, fallback: string) {
@@ -99,10 +117,25 @@ export async function GET() {
     const rows = await prisma.$queryRaw<RawBookmarkRow[]>`
       SELECT "id", "decisionNumber",
              CAST("decisionYear" AS TEXT) AS "decisionYear",
-             "parties", "shortSummary",
+             "parties", "shortSummary", "law",
              CAST("timestamp" AS TEXT) AS "timestamp"
       FROM "AdminBookmark"
       ORDER BY "decisionYear" ASC, "decisionNumber" ASC`;
+
+    // Backfill law from Decision table if missing
+    const missing = rows.filter(r => !r.law).map(r => r.id);
+    if (missing.length > 0) {
+      const decisions = await prisma.decision.findMany({
+        where: { id: { in: missing } },
+        select: { id: true, law: true }
+      });
+      const lawMap = new Map(decisions.map(d => [d.id, d.law]));
+      for (const r of rows) {
+        if (!r.law && lawMap.has(r.id)) {
+          r.law = lawMap.get(r.id) || null;
+        }
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -150,6 +183,21 @@ export async function POST(request: Request) {
 
       const upserts = rawUpserts.map(normalize).filter((b): b is NormalizedBookmark => b !== null);
       const removes = rawRemoves.filter((id): id is string => typeof id === 'string' && id.length > 0);
+
+      // Pre-fetch laws for any items needing law
+      const needingLaw = upserts.filter(u => !u.law).map(u => u.id);
+      if (needingLaw.length > 0) {
+        const decisions = await prisma.decision.findMany({
+          where: { id: { in: needingLaw } },
+          select: { id: true, law: true }
+        });
+        const lawMap = new Map(decisions.map(d => [d.id, d.law]));
+        for (const u of upserts) {
+          if (!u.law && lawMap.has(u.id)) {
+            u.law = lawMap.get(u.id) || null;
+          }
+        }
+      }
 
       if (removes.length > 0) {
         await prisma.adminBookmark.deleteMany({ where: { id: { in: removes } } });
@@ -204,13 +252,14 @@ export async function POST(request: Request) {
         }
       }
 
-      await upsertOp(normalized);
+      const resolved = await resolveLawIfMissing(normalized);
+      await upsertOp(resolved);
 
       return NextResponse.json({
         success: true,
         savedToDb: true,
         isBookmarked: true,
-        bookmark: { ...normalized },
+        bookmark: { ...resolved },
         message: 'แอดมิน: บันทึกบุ๊กมาร์กลงฐานข้อมูลเรียบร้อย (ซิงค์ใช้งานได้ทุกเครื่อง)',
       });
     }

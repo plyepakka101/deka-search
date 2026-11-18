@@ -25,7 +25,8 @@ export async function GET(request: Request) {
         decisionNumber: true,
         decisionYear: true,
         parties: true,
-        shortSummary: true
+        shortSummary: true,
+        law: true
       }
     });
 

@@ -1,9 +1,22 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { Bookmark, Star, Scale, BookOpen, ChevronRight, Search, Trash2, ExternalLink, CloudOff, Cloud, RefreshCw } from "lucide-react";
-import { useBookmarks } from "@/hooks/useBookmarks";
+import {
+  Bookmark,
+  Star,
+  Scale,
+  BookOpen,
+  ChevronRight,
+  Search,
+  CloudOff,
+  Cloud,
+  RefreshCw,
+  Layers,
+  List,
+  Tag
+} from "lucide-react";
+import { useBookmarks, BookmarkItem } from "@/hooks/useBookmarks";
 import BookmarkButton from "@/components/BookmarkButton";
 import {
   initLawsData,
@@ -15,13 +28,84 @@ import {
 } from "@/components/law-mate/services/dataService";
 import { LawSection, UserNote, LawBook } from "@/components/law-mate/types";
 import { sortSectionsAscending } from "@/utils/sectionSort";
+import { extractDekaLaws } from "@/utils/lawParser";
+
+function getLawStyle(shortName: string, lawName: string) {
+  const text = `${shortName} ${lawName}`;
+  if (text.includes("อาญา") && !text.includes("วิธีพิจารณา")) {
+    return {
+      border: "border-red-200 dark:border-red-900/60",
+      bgHeader: "bg-red-50/90 dark:bg-red-950/40",
+      badge: "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300",
+      accent: "text-red-600 dark:text-red-400",
+    };
+  }
+  if (text.includes("แพ่งและพาณิชย์")) {
+    return {
+      border: "border-blue-200 dark:border-blue-900/60",
+      bgHeader: "bg-blue-50/90 dark:bg-blue-950/40",
+      badge: "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300",
+      accent: "text-blue-600 dark:text-blue-400",
+    };
+  }
+  if (text.includes("วิธีพิจารณาความแพ่ง") || text.includes("ป.วิ.พ.")) {
+    return {
+      border: "border-indigo-200 dark:border-indigo-900/60",
+      bgHeader: "bg-indigo-50/90 dark:bg-indigo-950/40",
+      badge: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300",
+      accent: "text-indigo-600 dark:text-indigo-400",
+    };
+  }
+  if (text.includes("วิธีพิจารณาความอาญา") || text.includes("ป.วิ.อ.")) {
+    return {
+      border: "border-orange-200 dark:border-orange-900/60",
+      bgHeader: "bg-orange-50/90 dark:bg-orange-950/40",
+      badge: "bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300",
+      accent: "text-orange-600 dark:text-orange-400",
+    };
+  }
+  if (text.includes("ล้มละลาย")) {
+    return {
+      border: "border-emerald-200 dark:border-emerald-900/60",
+      bgHeader: "bg-emerald-50/90 dark:bg-emerald-950/40",
+      badge: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300",
+      accent: "text-emerald-600 dark:text-emerald-400",
+    };
+  }
+  if (text.includes("รัฐธรรมนูญ") || text.includes("รธน.")) {
+    return {
+      border: "border-yellow-200 dark:border-yellow-900/60",
+      bgHeader: "bg-yellow-50/90 dark:bg-yellow-950/40",
+      badge: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300",
+      accent: "text-yellow-700 dark:text-yellow-400",
+    };
+  }
+  if (text.includes("ยาเสพติด")) {
+    return {
+      border: "border-rose-200 dark:border-rose-900/60",
+      bgHeader: "bg-rose-50/90 dark:bg-rose-950/40",
+      badge: "bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300",
+      accent: "text-rose-600 dark:text-rose-400",
+    };
+  }
+  return {
+    border: "border-slate-200 dark:border-slate-800",
+    bgHeader: "bg-slate-50 dark:bg-slate-800/60",
+    badge: "bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-200",
+    accent: "text-indigo-600 dark:text-indigo-400",
+  };
+}
 
 export default function BookmarksPage() {
   const { bookmarks, isLoaded, syncStatus, syncMessage, retrySync } = useBookmarks();
   const [activeTab, setActiveTab] = useState<"deka" | "laws">("deka");
-  // On a fresh device the local list is empty until the first server fetch finishes
   const isDekaLoading =
     !isLoaded || (bookmarks.length === 0 && (syncStatus === "idle" || syncStatus === "syncing"));
+
+  // Deka Bookmarks state
+  const [dekaViewMode, setDekaViewMode] = useState<"grouped" | "flat">("grouped");
+  const [selectedLawFilter, setSelectedLawFilter] = useState<string>("all");
+  const [dekaSearchQuery, setDekaSearchQuery] = useState<string>("");
 
   // Important sections state
   const [importantLaws, setImportantLaws] = useState<LawSection[]>([]);
@@ -89,6 +173,94 @@ export default function BookmarksPage() {
     const sorted = sortSectionsAscending(starred, l => l.sectionNumber, l => l.bookId);
     setImportantLaws(sorted);
   };
+
+  // Group and index bookmarks by law (if a decision cites multiple laws, record under all of them)
+  const { lawGroups, totalGroupedEntries, lawOptions, flatFilteredBookmarks } = useMemo(() => {
+    const q = dekaSearchQuery.trim().toLowerCase();
+
+    // 1. Filter raw bookmarks by search query
+    const filtered = bookmarks.filter((b) => {
+      if (!q) return true;
+      const matchNum = b.decisionNumber.toLowerCase().includes(q);
+      const matchYear = String(b.decisionYear || "").includes(q);
+      const matchParties = (b.parties || "").toLowerCase().includes(q);
+      const matchSummary = (b.shortSummary || "").toLowerCase().includes(q);
+      const matchLaw = (b.law || "").toLowerCase().includes(q);
+      return matchNum || matchYear || matchParties || matchSummary || matchLaw;
+    });
+
+    // 2. Map of LawKey -> LawGroup
+    const groupMap = new Map<
+      string,
+      {
+        lawKey: string;
+        lawName: string;
+        shortName: string;
+        items: Array<{
+          decision: BookmarkItem;
+          sectionsInThisLaw: string[];
+          otherLaws: Array<{ lawName: string; shortName: string }>;
+        }>;
+      }
+    >();
+
+    let totalGroupedCount = 0;
+
+    for (const b of filtered) {
+      const citedLaws = extractDekaLaws(b.law);
+
+      // If this deka cites multiple laws, insert into EVERY cited law group!
+      for (const lawItem of citedLaws) {
+        if (!groupMap.has(lawItem.lawKey)) {
+          groupMap.set(lawItem.lawKey, {
+            lawKey: lawItem.lawKey,
+            lawName: lawItem.lawName,
+            shortName: lawItem.shortName,
+            items: [],
+          });
+        }
+
+        const otherLaws = citedLaws
+          .filter((other) => other.lawKey !== lawItem.lawKey)
+          .map((other) => ({ lawName: other.lawName, shortName: other.shortName }));
+
+        groupMap.get(lawItem.lawKey)!.items.push({
+          decision: b,
+          sectionsInThisLaw: lawItem.sections,
+          otherLaws,
+        });
+
+        totalGroupedCount++;
+      }
+    }
+
+    // Sort law groups by item count descending, placing 'unspecified' last
+    const sortedGroups = Array.from(groupMap.values()).sort((a, b) => {
+      if (a.lawKey === "unspecified") return 1;
+      if (b.lawKey === "unspecified") return -1;
+      return b.items.length - a.items.length;
+    });
+
+    const options = sortedGroups.map((g) => ({
+      key: g.lawKey,
+      label: g.shortName || g.lawName,
+      count: g.items.length,
+    }));
+
+    return {
+      lawGroups: sortedGroups,
+      totalGroupedEntries: totalGroupedCount,
+      lawOptions: options,
+      flatFilteredBookmarks: filtered,
+    };
+  }, [bookmarks, dekaSearchQuery]);
+
+  const displayedLawGroups = useMemo(() => {
+    if (selectedLawFilter === "all") {
+      return lawGroups;
+    }
+    return lawGroups.filter((g) => g.lawKey === selectedLawFilter);
+  }, [lawGroups, selectedLawFilter]);
 
   // Filtered important laws by book and search query
   const filteredImportantLaws = importantLaws.filter(law => {
@@ -172,7 +344,7 @@ export default function BookmarksPage() {
               <div>
                 <p className="font-semibold">บุ๊กมาร์กเก็บในเครื่องนี้เท่านั้น</p>
                 <p className="text-xs mt-0.5 opacity-90">
-                  ต้องเข้าสู่ระบบด้วยบัญชีแอดมิน (อีเมลต้องอยู่ใน ADMIN_EMAILS ของ Vercel) จึงจะซิงค์ข้ามเครื่องได้
+                  ต้องเข้าสู่ระบบด้วยบัญชีแอดมิน (อีเมลต้องอยู่ใน ADMIN_EMAILS) จึงจะซิงค์ข้ามเครื่องได้
                 </p>
               </div>
             </div>
@@ -215,53 +387,306 @@ export default function BookmarksPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {bookmarks.map((decision) => (
-                <div
-                  key={decision.id}
-                  className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700 transition-all group"
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <Link href={`/decision/${decision.id}`} className="block">
-                        <h2 className="text-lg font-bold text-indigo-700 dark:text-indigo-400 group-hover:underline transition-colors">
-                          คำพิพากษาศาลฎีกาที่ {decision.decisionNumber}
-                        </h2>
-                      </Link>
-                      {decision.decisionYear && (
-                        <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-3 py-0.5 rounded-full text-xs font-semibold">
-                          ปี {decision.decisionYear}
-                        </span>
-                      )}
-                    </div>
-                    <BookmarkButton decision={decision} />
+              {/* Controls: Search, View Mode Toggle & Law Filter Chips */}
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
+                {/* Search & View Mode row */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={dekaSearchQuery}
+                      onChange={(e) => setDekaSearchQuery(e.target.value)}
+                      placeholder="ค้นหาในบุ๊กมาร์ก (เลขฎีกา, ชื่อกฎหมาย, คู่ความ, ข้อความ)..."
+                      className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-sm text-slate-800 dark:text-white bg-slate-50 dark:bg-slate-800/50 outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
                   </div>
 
-                  {decision.parties && (
-                    <p className="text-slate-700 dark:text-slate-300 text-sm font-medium mb-3">
-                      <span className="text-slate-400 font-normal mr-2">คู่ความ:</span>
-                      {decision.parties}
-                    </p>
-                  )}
-
-                  {decision.shortSummary && (
-                    <p className="text-slate-600 dark:text-slate-400 text-sm line-clamp-3 leading-relaxed mb-4">
-                      {decision.shortSummary}
-                    </p>
-                  )}
-
-                  <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
-                    <span className="text-xs text-slate-400">
-                      บันทึกเมื่อ {new Date(decision.timestamp).toLocaleDateString("th-TH")}
-                    </span>
-                    <Link
-                      href={`/decision/${decision.id}`}
-                      className="inline-flex items-center text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                  {/* Mode switcher: Group by Law vs Flat list */}
+                  <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shrink-0 self-start sm:self-auto">
+                    <button
+                      onClick={() => setDekaViewMode("grouped")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        dekaViewMode === "grouped"
+                          ? "bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 shadow-2xs"
+                          : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      }`}
+                      title="จัดกลุ่มตามกฎหมายแต่ละฉบับ"
                     >
-                      อ่านฉบับเต็ม <ChevronRight className="w-4 h-4 ml-0.5" />
-                    </Link>
+                      <Layers className="w-3.5 h-3.5" />
+                      <span>จัดกลุ่มตามกฎหมาย</span>
+                    </button>
+
+                    <button
+                      onClick={() => setDekaViewMode("flat")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        dekaViewMode === "flat"
+                          ? "bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 shadow-2xs"
+                          : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      }`}
+                      title="แสดงรายการทั้งหมด"
+                    >
+                      <List className="w-3.5 h-3.5" />
+                      <span>รายการทั้งหมด ({bookmarks.length})</span>
+                    </button>
                   </div>
                 </div>
-              ))}
+
+                {/* Law Filter Chips */}
+                {lawOptions.length > 0 && (
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none pt-1 border-t border-slate-100 dark:border-slate-800">
+                    <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mr-1 shrink-0 uppercase tracking-wider">
+                      กฎหมาย:
+                    </span>
+                    <button
+                      onClick={() => setSelectedLawFilter("all")}
+                      className={`px-3 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                        selectedLawFilter === "all"
+                          ? "bg-indigo-600 text-white shadow-2xs"
+                          : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
+                      }`}
+                    >
+                      ทั้งหมด ({dekaViewMode === "grouped" ? totalGroupedEntries : flatFilteredBookmarks.length})
+                    </button>
+
+                    {lawOptions.map((opt) => (
+                      <button
+                        key={opt.key}
+                        onClick={() => setSelectedLawFilter(opt.key)}
+                        className={`px-3 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                          selectedLawFilter === opt.key
+                            ? "bg-indigo-600 text-white shadow-2xs"
+                            : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
+                        }`}
+                      >
+                        {opt.label} ({opt.count})
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* View 1: Grouped by Law */}
+              {dekaViewMode === "grouped" ? (
+                displayedLawGroups.length === 0 ? (
+                  <div className="bg-white dark:bg-slate-900 p-8 text-center rounded-3xl border border-slate-200 dark:border-slate-800">
+                    <p className="text-slate-500">ไม่พบคำพิพากษาที่ตรงกับการค้นหาหรือตัวกรอง</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {displayedLawGroups.map((group) => {
+                      const style = getLawStyle(group.shortName, group.lawName);
+                      return (
+                        <div
+                          key={group.lawKey}
+                          className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden"
+                        >
+                          {/* Law Group Header */}
+                          <div
+                            className={`p-4 sm:p-5 border-b ${style.border} ${style.bgHeader} flex flex-wrap items-center justify-between gap-3`}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <div className="p-2 bg-white dark:bg-slate-900 rounded-xl shadow-2xs text-indigo-600 dark:text-indigo-400 border border-slate-200/60 dark:border-slate-700/60">
+                                <BookOpen className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-tight">
+                                    {group.lawName}
+                                  </h2>
+                                  {group.shortName && group.shortName !== group.lawName && (
+                                    <span className={`text-xs px-2 py-0.5 rounded-md font-bold ${style.badge}`}>
+                                      {group.shortName}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                  คำพิพากษาศาลฎีกาที่วินิจฉัยปรับบทตามกฎหมายฉบับนี้
+                                </p>
+                              </div>
+                            </div>
+
+                            <span className="px-3 py-1 rounded-full text-xs font-bold bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700 shadow-2xs">
+                              {group.items.length} คำพิพากษา
+                            </span>
+                          </div>
+
+                          {/* List of decisions under this law */}
+                          <div className="p-4 sm:p-6 space-y-4">
+                            {group.items.map(({ decision, sectionsInThisLaw, otherLaws }) => (
+                              <div
+                                key={`${group.lawKey}-${decision.id}`}
+                                className="bg-slate-50/60 dark:bg-slate-800/40 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 hover:bg-white dark:hover:bg-slate-800 hover:shadow-xs transition-all group"
+                              >
+                                <div className="flex justify-between items-start mb-2">
+                                  <div className="flex items-center gap-2.5 flex-wrap">
+                                    <Link href={`/decision/${decision.id}`} className="block">
+                                      <h3 className="text-base sm:text-lg font-bold text-indigo-700 dark:text-indigo-400 group-hover:underline transition-colors">
+                                        คำพิพากษาศาลฎีกาที่ {decision.decisionNumber}
+                                      </h3>
+                                    </Link>
+                                    {decision.decisionYear && (
+                                      <span className="bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-2.5 py-0.5 rounded-full text-xs font-semibold">
+                                        ปี {decision.decisionYear}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <BookmarkButton decision={decision} />
+                                </div>
+
+                                {decision.parties && (
+                                  <p className="text-slate-700 dark:text-slate-300 text-xs sm:text-sm font-medium mb-2.5">
+                                    <span className="text-slate-400 font-normal mr-2">คู่ความ:</span>
+                                    {decision.parties}
+                                  </p>
+                                )}
+
+                                {decision.shortSummary && (
+                                  <p className="text-slate-600 dark:text-slate-400 text-xs sm:text-sm line-clamp-3 leading-relaxed mb-3">
+                                    {decision.shortSummary}
+                                  </p>
+                                )}
+
+                                {/* Specific Sections in this Law */}
+                                {sectionsInThisLaw && sectionsInThisLaw.length > 0 && (
+                                  <div className="flex items-center gap-1.5 flex-wrap mb-2.5">
+                                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                                      มาตราในฉบับนี้:
+                                    </span>
+                                    {sectionsInThisLaw.map((sec, sIdx) => (
+                                      <span
+                                        key={sIdx}
+                                        className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-indigo-100/90 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
+                                      >
+                                        ม. {sec}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Multi-Law Cross References */}
+                                {otherLaws && otherLaws.length > 0 && (
+                                  <div className="flex items-center gap-1.5 flex-wrap mb-3 text-xs">
+                                    <span className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
+                                      <Layers className="w-3 h-3 text-slate-400" />
+                                      เกี่ยวข้องกับกฎหมายอื่นด้วย:
+                                    </span>
+                                    {otherLaws.map((other, oIdx) => (
+                                      <button
+                                        key={oIdx}
+                                        onClick={() => setSelectedLawFilter(other.lawName)}
+                                        className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                                        title={`กดเพื่อดูกลุ่ม ${other.lawName}`}
+                                      >
+                                        {other.shortName || other.lawName}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+
+                                <div className="flex items-center justify-between pt-2.5 border-t border-slate-200/60 dark:border-slate-800">
+                                  <span className="text-[11px] text-slate-400">
+                                    บันทึกเมื่อ {new Date(decision.timestamp).toLocaleDateString("th-TH")}
+                                  </span>
+                                  <Link
+                                    href={`/decision/${decision.id}`}
+                                    className="inline-flex items-center text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                                  >
+                                    อ่านฉบับเต็ม <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
+                                  </Link>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              ) : (
+                /* View 2: Flat List */
+                <div className="space-y-4">
+                  {flatFilteredBookmarks.length === 0 ? (
+                    <div className="bg-white dark:bg-slate-900 p-8 text-center rounded-3xl border border-slate-200 dark:border-slate-800">
+                      <p className="text-slate-500">ไม่พบคำพิพากษาที่ตรงกับการค้นหา</p>
+                    </div>
+                  ) : (
+                    flatFilteredBookmarks.map((decision) => {
+                      const laws = extractDekaLaws(decision.law);
+                      return (
+                        <div
+                          key={decision.id}
+                          className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700 transition-all group"
+                        >
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <Link href={`/decision/${decision.id}`} className="block">
+                                <h2 className="text-lg font-bold text-indigo-700 dark:text-indigo-400 group-hover:underline transition-colors">
+                                  คำพิพากษาศาลฎีกาที่ {decision.decisionNumber}
+                                </h2>
+                              </Link>
+                              {decision.decisionYear && (
+                                <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-3 py-0.5 rounded-full text-xs font-semibold">
+                                  ปี {decision.decisionYear}
+                                </span>
+                              )}
+                            </div>
+                            <BookmarkButton decision={decision} />
+                          </div>
+
+                          {decision.parties && (
+                            <p className="text-slate-700 dark:text-slate-300 text-sm font-medium mb-2.5">
+                              <span className="text-slate-400 font-normal mr-2">คู่ความ:</span>
+                              {decision.parties}
+                            </p>
+                          )}
+
+                          {decision.shortSummary && (
+                            <p className="text-slate-600 dark:text-slate-400 text-sm line-clamp-3 leading-relaxed mb-3">
+                              {decision.shortSummary}
+                            </p>
+                          )}
+
+                          {/* Laws Tag List */}
+                          {laws.length > 0 && laws[0].lawKey !== "unspecified" && (
+                            <div className="flex items-center gap-1.5 flex-wrap mb-3">
+                              <span className="text-[11px] font-bold text-slate-400 mr-1 flex items-center gap-1">
+                                <Tag className="w-3 h-3" />
+                                กฎหมายที่เกี่ยวข้อง:
+                              </span>
+                              {laws.map((l, lIdx) => (
+                                <button
+                                  key={lIdx}
+                                  onClick={() => {
+                                    setDekaViewMode("grouped");
+                                    setSelectedLawFilter(l.lawKey);
+                                  }}
+                                  className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800 transition-colors cursor-pointer"
+                                >
+                                  {l.shortName || l.lawName}
+                                  {l.sections.length > 0 ? ` (ม. ${l.sections.join(", ")})` : ""}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
+                            <span className="text-xs text-slate-400">
+                              บันทึกเมื่อ {new Date(decision.timestamp).toLocaleDateString("th-TH")}
+                            </span>
+                            <Link
+                              href={`/decision/${decision.id}`}
+                              className="inline-flex items-center text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                            >
+                              อ่านฉบับเต็ม <ChevronRight className="w-4 h-4 ml-0.5" />
+                            </Link>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
             </div>
           )}
         </section>

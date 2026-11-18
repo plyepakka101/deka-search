@@ -8,6 +8,7 @@ export interface BookmarkItem {
   decisionYear?: number | null;
   parties?: string | null;
   shortSummary?: string | null;
+  law?: string | null;
   timestamp: number;
 }
 
@@ -129,6 +130,7 @@ interface ServerBookmarkRow {
   decisionYear?: number | null;
   parties?: string | null;
   shortSummary?: string | null;
+  law?: string | null;
   timestamp?: number | null;
 }
 
@@ -148,6 +150,7 @@ function toItem(b: ServerBookmarkRow): BookmarkItem {
     decisionYear: b.decisionYear ? Number(b.decisionYear) : null,
     parties: b.parties || null,
     shortSummary: b.shortSummary || null,
+    law: b.law || null,
     timestamp: b.timestamp ? Number(b.timestamp) : Date.now(),
   };
 }
@@ -285,6 +288,7 @@ async function fetchServerBookmarks(force = false): Promise<void> {
       }
 
       await reconcileWithServer(Array.isArray(data.bookmarks) ? data.bookmarks : []);
+      void enrichMissingLaws();
     } catch {
       // Offline / network failure -> keep using the local cache
       setSyncState('error', 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ (ออฟไลน์?) — ใช้ข้อมูลที่เก็บในเครื่องนี้ไปก่อน');
@@ -295,6 +299,43 @@ async function fetchServerBookmarks(force = false): Promise<void> {
   })();
 
   return globalFetchPromise;
+}
+
+let isEnriching = false;
+async function enrichMissingLaws() {
+  if (isEnriching || typeof window === 'undefined') return;
+  const missing = globalBookmarks.filter(i => !i.law).map(i => i.id);
+  if (missing.length === 0) return;
+
+  isEnriching = true;
+  try {
+    const idsBatch = missing.slice(0, 50);
+    const res = await fetch(`/api/decisions?ids=${encodeURIComponent(idsBatch.join(','))}`);
+    if (res.ok) {
+      const decisions: Array<{ id: string; law?: string | null }> = await res.json();
+      if (Array.isArray(decisions)) {
+        const lawMap = new Map(decisions.map(d => [d.id, d.law]));
+        let changed = false;
+        const updated = globalBookmarks.map(item => {
+          if (!item.law && lawMap.has(item.id)) {
+            const val = lawMap.get(item.id);
+            if (val) {
+              changed = true;
+              return { ...item, law: val };
+            }
+          }
+          return item;
+        });
+        if (changed) {
+          saveToLocalStorage(updated);
+          updateGlobalState(updated, true);
+        }
+      }
+    }
+  } catch {
+  } finally {
+    isEnriching = false;
+  }
 }
 
 // Pick up changes made on other devices when the tab becomes visible / comes back online
@@ -327,6 +368,7 @@ export function useBookmarks() {
     bindRefetchTriggers();
     // Trigger a background server check (deduplicated + throttled)
     void fetchServerBookmarks();
+    void enrichMissingLaws();
 
     return () => {
       listeners.delete(handleUpdate);
