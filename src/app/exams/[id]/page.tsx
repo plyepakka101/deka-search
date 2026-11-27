@@ -9,6 +9,7 @@ import {
   Sparkles, CheckSquare, Square, Eye, FileText, Check, Save,
   Bot, Key, RefreshCw
 } from 'lucide-react';
+import ExamCategoryMover from '@/components/ExamCategoryMover';
 import { 
   saveExamAttempt, 
   getExamAttempts, 
@@ -321,6 +322,16 @@ export default function ExamRoomPage() {
           </div>
         </div>
       </header>
+
+      <div className="max-w-7xl mx-auto px-4 pt-3 empty:hidden">
+        <ExamCategoryMover
+          questionId={question.id}
+          currentCategory={question.category}
+          onMoved={({ category, questionNumber }) =>
+            setQuestion((prev: any) => (prev ? { ...prev, category, questionNumber } : prev))
+          }
+        />
+      </div>
 
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 py-6">

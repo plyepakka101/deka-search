@@ -78,7 +78,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'ไม่พบข้อสอบ' }, { status: 404 });
     }
     if (question.category === target) {
-      return NextResponse.json({ success: true, moved: false });
+      return NextResponse.json({ success: true, moved: false, category: question.category, questionNumber: question.questionNumber });
     }
 
     const existing = await loadExistingFingerprints([target]);
@@ -90,12 +90,13 @@ export async function PATCH(request: Request) {
     }
 
     const next = await loadNextQuestionNumbers([target]);
+    const newNumber = String(next.get(target) ?? 1);
     await prisma.examQuestion.update({
       where: { id },
-      data: { category: target, questionNumber: String(next.get(target) ?? 1) },
+      data: { category: target, questionNumber: newNumber },
     });
 
-    return NextResponse.json({ success: true, moved: true });
+    return NextResponse.json({ success: true, moved: true, category: target, questionNumber: newNumber });
   } catch (error) {
     console.error('Error moving exam question:', error);
     return NextResponse.json({ error: 'ไม่สามารถย้ายข้อสอบได้' }, { status: 500 });
