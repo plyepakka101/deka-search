@@ -54,11 +54,12 @@ export async function getExamCategories(): Promise<ExamCategoryInfo[]> {
       result.push({ name: c.name, builtin: false, id: c.id });
     }
 
-    const grouped: { category: string; _count: { id: number } }[] = await prisma.examQuestion.groupBy({
+    const grouped = await prisma.examQuestion.groupBy({
       by: ['category'],
       _count: { id: true },
     });
-    const counts = new Map<string, number>(grouped.map((g) => [g.category, g._count.id]));
+    const counts = new Map<string, number>();
+    for (const g of grouped) counts.set(g.category, g._count.id);
     for (const g of grouped) {
       if (!seen.has(g.category)) {
         seen.add(g.category);
