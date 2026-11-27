@@ -8,7 +8,7 @@ import {
   Award, Trophy, History, RotateCcw, ArrowRight, BarChart3, Activity,
   Flame, Target, Zap
 } from 'lucide-react';
-import { EXAM_CATEGORIES } from '@/utils/examParser';
+import { useExamCategories } from '@/hooks/useExamCategories';
 import { 
   getExamStatistics, 
   getDueReviewItems, 
@@ -24,6 +24,7 @@ import {
 } from '@/services/examService';
 
 export default function ExamsCatalogPage() {
+  const examCategories = useExamCategories();
   const [activeMainTab, setActiveMainTab] = useState<'all' | 'due' | 'history' | 'analytics'>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -332,7 +333,7 @@ export default function ExamsCatalogPage() {
               </div>
             </form>
 
-            {/* 9 Categories Tabs */}
+            {/* Category Tabs (built-in + admin-defined) */}
             <div className="border-t border-slate-100 pt-3">
               <div className="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-1.5">
                 <Filter size={14} />
@@ -350,7 +351,7 @@ export default function ExamsCatalogPage() {
                   ทั้งหมด ({totalQuestions})
                 </button>
 
-                {EXAM_CATEGORIES.map((cat) => {
+                {examCategories.map((cat) => {
                   const count = categoryStats[cat] || 0;
                   const isSelected = selectedCategory === cat;
                   return (

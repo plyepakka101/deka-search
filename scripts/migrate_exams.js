@@ -51,6 +51,17 @@ async function migrate() {
   await client.execute('CREATE INDEX IF NOT EXISTS "ExamQuestion_examYear_idx" ON "ExamQuestion"("examYear");');
 
   console.log('Created all indexes successfully!');
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS "ExamCategoryDef" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "name" TEXT NOT NULL,
+        "sortOrder" INTEGER NOT NULL DEFAULT 0,
+        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  await client.execute('CREATE UNIQUE INDEX IF NOT EXISTS "ExamCategoryDef_name_key" ON "ExamCategoryDef"("name");');
+  console.log('Created ExamCategoryDef table');
 }
 
 migrate().then(() => {
