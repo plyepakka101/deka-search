@@ -7,7 +7,7 @@ import {
   ArrowLeft, Clock, Play, Pause, RotateCcw, CheckCircle2, 
   AlertCircle, Scale, BookOpen, ChevronRight, X, ExternalLink, 
   Sparkles, CheckSquare, Square, Eye, FileText, Check, Save,
-  Bot, Key, RefreshCw
+  Bot, Key, RefreshCw, FolderInput
 } from 'lucide-react';
 import ExamCategoryMover from '@/components/ExamCategoryMover';
 import { 
@@ -25,6 +25,12 @@ export default function ExamRoomPage() {
   const [question, setQuestion] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminCategories, setAdminCategories] = useState<{ name: string }[]>([]);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [targetCategory, setTargetCategory] = useState('');
+  const [isCategorySaving, setIsCategorySaving] = useState(false);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
 
   // User Answer state
   const [userDraft, setUserDraft] = useState('');
@@ -64,6 +70,19 @@ export default function ExamRoomPage() {
           throw new Error(data.error || 'ไม่สามารถโหลดข้อสอบได้');
         }
         setQuestion(data.question);
+        setTargetCategory(data.question.category || '');
+        try {
+          const adminRes = await fetch('/api/admin/exam-categories', { cache: 'no-store' });
+          if (adminRes.ok) {
+            const adminData = await adminRes.json();
+            setIsAdmin(true);
+            setAdminCategories(adminData.categories || []);
+          } else {
+            setIsAdmin(false);
+          }
+        } catch {
+          setIsAdmin(false);
+        }
 
         // Load saved draft from localStorage if any
         if (typeof window !== 'undefined') {
@@ -135,6 +154,30 @@ export default function ExamRoomPage() {
     setCheckedIssues(updated);
     if (typeof window !== 'undefined') {
       localStorage.setItem(`deka_exam_issues_${id}`, JSON.stringify(updated));
+    }
+  };
+
+  const handleMoveCategory = async () => {
+    if (!isAdmin || !targetCategory || targetCategory === question?.category) {
+      setIsCategoryModalOpen(false);
+      return;
+    }
+    setIsCategorySaving(true);
+    setCategoryError(null);
+    try {
+      const res = await fetch(`/api/exams/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category: targetCategory }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'ย้ายหมวดข้อสอบไม่สำเร็จ');
+      setQuestion((prev: any) => prev ? { ...prev, category: data.category } : prev);
+      setIsCategoryModalOpen(false);
+    } catch (err: any) {
+      setCategoryError(err.message || 'เกิดข้อผิดพลาดในการย้ายหมวด');
+    } finally {
+      setIsCategorySaving(false);
     }
   };
 
@@ -286,6 +329,20 @@ export default function ExamRoomPage() {
                 <span className="text-xs text-slate-500 font-medium hidden sm:inline">
                   {question.category}
                 </span>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTargetCategory(question.category || '');
+                      setCategoryError(null);
+                      setIsCategoryModalOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors"
+                    title="ย้ายข้อสอบไปยังหมวดอื่น"
+                  >
+                    <FolderInput size={12} /> ย้ายหมวด
+                  </button>
+                )}
               </div>
               <h1 className="text-xs sm:text-sm font-bold text-slate-900 line-clamp-1 max-w-md">
                 {question.title || `ข้อสอบข้อ ${question.questionNumber}`}
@@ -943,6 +1000,32 @@ export default function ExamRoomPage() {
               >
                 ปิดหน้าต่าง
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isCategoryModalOpen && isAdmin && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 p-5 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">ย้ายหมวดข้อสอบ</h3>
+                <p className="text-xs text-slate-500 mt-1">ข้อ {question.questionNumber} · {question.title || 'ข้อสอบ'}</p>
+              </div>
+              <button type="button" onClick={() => setIsCategoryModalOpen(false)} className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="exam-target-category" className="block text-xs font-semibold text-slate-700">เลือกหมวดปลายทาง</label>
+              <select id="exam-target-category" value={targetCategory} onChange={(e) => setTargetCategory(e.target.value)} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                {adminCategories.map((cat) => <option key={cat.name} value={cat.name}>{cat.name}</option>)}
+              </select>
+              <p className="text-[11px] text-slate-500">เปลี่ยนเฉพาะข้อสอบข้อนี้ ไม่เปลี่ยนหมวดของข้ออื่นในชุดเดียวกัน</p>
+            </div>
+            {categoryError && <div className="p-2.5 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg">{categoryError}</div>}
+            <div className="flex justify-end gap-2 pt-1">
+              <button type="button" onClick={() => setIsCategoryModalOpen(false)} className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">ยกเลิก</button>
+              <button type="button" onClick={handleMoveCategory} disabled={isCategorySaving || !targetCategory || targetCategory === question.category} className="px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl disabled:opacity-50">{isCategorySaving ? 'กำลังบันทึก...' : 'ยืนยันการย้ายหมวด'}</button>
             </div>
           </div>
         </div>
