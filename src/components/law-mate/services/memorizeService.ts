@@ -88,6 +88,54 @@ export const BUILTIN_DECKS: MemorizationDeck[] = [
     color: 'bg-slate-600',
     sortOrder: 8,
     isBuiltin: true
+  },
+  {
+    id: 'deck-consumer_proc',
+    name: 'พ.ร.บ. วิธีพิจารณาคดีผู้บริโภค (ผบ.)',
+    description: 'กระบวนพิจารณาคดีผู้บริโภค ภาระการพิสูจน์ ความรับผิดสินค้าที่ไม่ปลอดภัย (ม. 3, 17, 29)',
+    color: 'bg-amber-600',
+    sortOrder: 9,
+    isBuiltin: true
+  },
+  {
+    id: 'deck-copyright',
+    name: 'พ.ร.บ. ลิขสิทธิ์',
+    description: 'งานอันมีลิขสิทธิ์ การคุ้มครอง ข้อยกเว้นการละเมิดลิขสิทธิ์ (ม. 6, 15, 27, 32)',
+    color: 'bg-purple-600',
+    sortOrder: 10,
+    isBuiltin: true
+  },
+  {
+    id: 'deck-juvenile_court',
+    name: 'พ.ร.บ. ศาลเยาวชนและครอบครัวฯ',
+    description: 'กระบวนพิจารณาคดีเด็กและเยาวชน การจับกุม การตรวจสอบการจับ (ม. 4, 65, 71)',
+    color: 'bg-pink-600',
+    sortOrder: 11,
+    isBuiltin: true
+  },
+  {
+    id: 'deck-labour_protection',
+    name: 'พ.ร.บ. คุ้มครองแรงงาน',
+    description: 'การใช้แรงงาน ค่าจ้าง สิทธิ ค่าชดเชยการเลิกจ้าง (ม. 5, 118, 119)',
+    color: 'bg-orange-500',
+    sortOrder: 12,
+    isBuiltin: true
+  },
+  {
+    id: 'deck-admin_court',
+    name: 'พ.ร.บ. จัดตั้งศาลปกครองฯ',
+    description: 'เขตอำนาจศาลปกครอง อำนาจฟ้อง เงื่อนไขและอายุความฟ้องคดี (ม. 9, 42, 49)',
+    color: 'bg-sky-600',
+    sortOrder: 13,
+    isBuiltin: true
+  },
+  {
+    id: 'deck-revenue',
+    name: 'ประมวลรัษฎากร (ป.รัษฎากร)',
+    description: 'ภาษีเงินได้บุคคลธรรมดาและนิติบุคคล ภาษีมูลค่าเพิ่ม อากรแสตมป์ (ม. 39, 40)',
+    color: 'bg-emerald-700',
+    sortOrder: 14,
+    isBuiltin: true
   }
 ];
 
@@ -109,7 +157,25 @@ const STARTER_ITEMS: Array<{ deckId: string; sectionId: string; title: string }>
   { deckId: 'deck-crim_proc', sectionId: 'crim_proc-2', title: 'มาตรา 2 - คำนิยาม (ผู้เสียหาย, ผู้ต้องหา)' },
   { deckId: 'deck-crim_proc', sectionId: 'crim_proc-28', title: 'มาตรา 28 - ผู้มีอำนาจฟ้องคดีอาญา' },
   { deckId: 'deck-crim_proc', sectionId: 'crim_proc-39', title: 'มาตรา 39 - สิทธินำคดีอาญามาฟ้องระงับ' },
-  { deckId: 'deck-crim_proc', sectionId: 'crim_proc-158', title: 'มาตรา 158 - แบบของคำฟ้อง' }
+  { deckId: 'deck-crim_proc', sectionId: 'crim_proc-158', title: 'มาตรา 158 - แบบของคำฟ้อง' },
+  { deckId: 'deck-consumer_proc', sectionId: 'consumer_proc-3', title: 'มาตรา 3 - คำนิยามคดีผู้บริโภค' },
+  { deckId: 'deck-consumer_proc', sectionId: 'consumer_proc-17', title: 'มาตรา 17 - การฟ้องคดีผู้บริโภค' },
+  { deckId: 'deck-consumer_proc', sectionId: 'consumer_proc-29', title: 'มาตรา 29 - ภาระการพิสูจน์ข้อเท็จจริง' },
+  { deckId: 'deck-copyright', sectionId: 'copyright-6', title: 'มาตรา 6 - งานอันมีลิขสิทธิ์' },
+  { deckId: 'deck-copyright', sectionId: 'copyright-15', title: 'มาตรา 15 - สิทธิแต่ผู้เดียวของเจ้าของลิขสิทธิ์' },
+  { deckId: 'deck-copyright', sectionId: 'copyright-27', title: 'มาตรา 27 - การละเมิดลิขสิทธิ์' },
+  { deckId: 'deck-copyright', sectionId: 'copyright-32', title: 'มาตรา 32 - ข้อยกเว้นการละเมิดลิขสิทธิ์ (Fair Use)' },
+  { deckId: 'deck-juvenile_court', sectionId: 'juvenile_court-4', title: 'มาตรา 4 - คำนิยามเด็กและเยาวชน' },
+  { deckId: 'deck-juvenile_court', sectionId: 'juvenile_court-65', title: 'มาตรา 65 - การจับกุมเด็กหรือเยาวชน' },
+  { deckId: 'deck-juvenile_court', sectionId: 'juvenile_court-71', title: 'มาตรา 71 - การตรวจสอบการจับ' },
+  { deckId: 'deck-labour_protection', sectionId: 'labour_protection-5', title: 'มาตรา 5 - คำนิยามนายจ้าง ลูกจ้าง' },
+  { deckId: 'deck-labour_protection', sectionId: 'labour_protection-118', title: 'มาตรา 118 - ค่าชดเชยการเลิกจ้าง' },
+  { deckId: 'deck-labour_protection', sectionId: 'labour_protection-119', title: 'มาตรา 119 - ข้อยกเว้นไม่ต้องจ่ายค่าชดเชย' },
+  { deckId: 'deck-admin_court', sectionId: 'admin_court-9', title: 'มาตรา 9 - เขตอำนาจศาลปกครอง' },
+  { deckId: 'deck-admin_court', sectionId: 'admin_court-42', title: 'มาตรา 42 - ผู้มีสิทธิฟ้องคดีปกครอง' },
+  { deckId: 'deck-admin_court', sectionId: 'admin_court-49', title: 'มาตรา 49 - อายุความการฟ้องคดีปกครอง' },
+  { deckId: 'deck-revenue', sectionId: 'revenue-39', title: 'มาตรา 39 - คำนิยามเงินได้พึงประเมิน' },
+  { deckId: 'deck-revenue', sectionId: 'revenue-40', title: 'มาตรา 40 - เงินได้พึงประเมิน 8 ประเภท' }
 ];
 
 const readJson = <T,>(key: string, fallback: T): T => {
@@ -175,6 +241,19 @@ function ensureLocalSeed(): { decks: MemorizationDeck[]; items: MemorizationItem
     decks = [...BUILTIN_DECKS];
     writeJson(MEMO_DECKS_KEY, decks);
     changed = true;
+  } else {
+    // If some BUILTIN_DECKS are missing in existing decks, merge them in
+    let deckAdded = false;
+    for (const bd of BUILTIN_DECKS) {
+      if (!decks.some(d => d.id === bd.id)) {
+        decks.push(bd);
+        deckAdded = true;
+      }
+    }
+    if (deckAdded) {
+      writeJson(MEMO_DECKS_KEY, decks);
+      changed = true;
+    }
   }
 
   if (!items || items.length === 0) {
@@ -199,6 +278,36 @@ function ensureLocalSeed(): { decks: MemorizationDeck[]; items: MemorizationItem
     items = sortMemoItems(rawItems);
     writeJson(MEMO_ITEMS_KEY, items);
     changed = true;
+  } else {
+    // Merge any missing starter items
+    const nowIso = new Date().toISOString();
+    let itemAdded = false;
+    for (const s of STARTER_ITEMS) {
+      const itemId = `${s.deckId}_${s.sectionId}`;
+      if (!items.some(i => i.id === itemId)) {
+        const match = s.title.match(/มาตรา\s+([0-9]+(\/[0-9]+)?(\s*(ทวิ|ตรี|จัตวา|เบญจ|ฉ|สัตต|อัฏฐ|นว|ทศ))?)/);
+        const sectionNumber = match ? match[1] : '';
+        items.push({
+          id: itemId,
+          deckId: s.deckId,
+          sectionId: s.sectionId,
+          title: s.title,
+          sectionNumber,
+          repetitions: 0,
+          intervalDays: 1,
+          easeFactor: 2.5,
+          streak: 0,
+          status: 'new' as const,
+          nextReviewAt: nowIso
+        });
+        itemAdded = true;
+      }
+    }
+    if (itemAdded) {
+      items = sortMemoItems(items);
+      writeJson(MEMO_ITEMS_KEY, items);
+      changed = true;
+    }
   }
 
   if (changed) {
@@ -216,13 +325,28 @@ export async function fetchDecks(): Promise<MemorizationDeck[]> {
   const local = readJson<MemorizationDeck[]>(MEMO_DECKS_KEY, BUILTIN_DECKS);
   
   try {
-    const res = await fetch('/api/memorize?view=decks');
+    const res = await fetch('/api/memorize?view=decks', { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data.decks)) {
-        writeJson(MEMO_DECKS_KEY, data.decks);
+        const customDecks: MemorizationDeck[] = data.decks.map((d: any) => ({
+          id: d.id,
+          name: d.name,
+          description: d.description || '',
+          color: d.color || 'bg-purple-600',
+          sortOrder: typeof d.sortOrder === 'number' ? d.sortOrder : 99,
+          isBuiltin: false
+        }));
+
+        const localCustom = local.filter(d => !d.isBuiltin);
+        const deckMap = new Map<string, MemorizationDeck>();
+        localCustom.forEach(d => deckMap.set(d.id, d));
+        customDecks.forEach(d => deckMap.set(d.id, d));
+
+        const merged = [...BUILTIN_DECKS, ...Array.from(deckMap.values())];
+        writeJson(MEMO_DECKS_KEY, merged);
         notify();
-        return data.decks;
+        return merged;
       }
     }
   } catch (e) {
@@ -418,6 +542,49 @@ export async function addSectionToDeck(deckId: string, sectionId: string, title?
 }
 
 /**
+ * Mark a section as remembered (จำได้ - Mastered) or unremembered (จำไม่ได้ - Need review) directly
+ */
+export async function markSectionMastery(
+  sectionId: string,
+  bookId?: string,
+  remembered: boolean = true,
+  title?: string
+): Promise<MemorizationItem | undefined> {
+  const targetDeckId = `deck-${bookId || 'crim'}`;
+  let localItems = readJson<MemorizationItem[]>(MEMO_ITEMS_KEY, []);
+  let item = localItems.find(i => i.sectionId === sectionId);
+
+  if (!item) {
+    // Automatically add to deck first
+    await addSectionToDeck(targetDeckId, sectionId, title);
+    localItems = readJson<MemorizationItem[]>(MEMO_ITEMS_KEY, []);
+    item = localItems.find(i => i.sectionId === sectionId);
+  }
+
+  if (item) {
+    // Quality 3 for remembered (Good), Quality 1 for unremembered (Again/Weak)
+    const updated = await recordReview(item.id, remembered ? 3 : 1, 'recall');
+    // Background sync mastery status to server
+    try {
+      fetch('/api/memorize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'set_mastery',
+          payload: {
+            itemId: item.id,
+            sectionId: item.sectionId,
+            masteryStatus: remembered ? 'mastered' : 'need_review'
+          }
+        })
+      }).catch(() => {});
+    } catch {}
+    return updated;
+  }
+  return undefined;
+}
+
+/**
  * Remove an item from memorization
  */
 export async function removeItem(itemId: string): Promise<boolean> {
@@ -471,12 +638,12 @@ export async function saveDeck(deck: Partial<MemorizationDeck> & { name: string 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'save_deck',
-        payload: deck
+        payload: newDeck
       })
     });
     if (res.ok) {
       const data = await res.json();
-      return data.deckId || deckId;
+      return data.deck?.id || deckId;
     }
   } catch (e) {
     // Offline ok
@@ -508,6 +675,37 @@ export async function deleteDeck(deckId: string): Promise<boolean> {
     // Offline ok
   }
   return true;
+}
+
+/**
+ * Get user-created custom folders/playlists
+ */
+export function getUserFolders(): MemorizationDeck[] {
+  return getLocalDecks().filter(d => !d.isBuiltin);
+}
+
+/**
+ * Get custom folders that contain a specific section
+ */
+export function getSectionFolders(sectionId: string): MemorizationDeck[] {
+  const localItems = readJson<MemorizationItem[]>(MEMO_ITEMS_KEY, []);
+  const inDecks = new Set(localItems.filter(i => i.sectionId === sectionId).map(i => i.deckId));
+  return getUserFolders().filter(f => inDecks.has(f.id));
+}
+
+/**
+ * Toggle a section's inclusion in a custom folder
+ */
+export async function toggleSectionInFolder(deckId: string, sectionId: string, title?: string): Promise<boolean> {
+  const localItems = readJson<MemorizationItem[]>(MEMO_ITEMS_KEY, []);
+  const existing = localItems.find(i => i.deckId === deckId && i.sectionId === sectionId);
+  if (existing) {
+    await removeItem(existing.id);
+    return false; // Removed
+  } else {
+    await addSectionToDeck(deckId, sectionId, title);
+    return true; // Added
+  }
 }
 
 /**

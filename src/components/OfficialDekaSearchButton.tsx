@@ -5,6 +5,41 @@ type OfficialDekaSearchButtonProps = {
   className?: string;
 };
 
+// Form fields posted by the official "ค้นหาจากหมายเลขคำพิพากษา" search form
+// (observed in the browser's Network > Payload for POST /search).
+// The number itself goes in `search_deka_no`; the rest are display options.
+const OFFICIAL_SEARCH_DEFAULTS: Record<string, string> = {
+  show_item_remark: "0",
+  show_item_primartcourt_deka_no: "0", // sic: the site's own spelling
+  show_item_deka_black_no: "0",
+  show_item_department: "0",
+  show_item_primarycourt: "1",
+  show_item_judge: "1",
+  show_item_source: "1",
+  show_item_long_text: "0",
+  show_item_short_text: "1",
+  show_item_law: "1",
+  show_item_litigant: "1",
+  show_result_state: "1",
+  search_form_type: "basic",
+  start: "true",
+  search_doctype: "",
+  search_type: "1",
+  search_word: "",
+  search_deka_no_ref: "",
+  search_deka_start_year: "",
+  search_deka_end_year: "",
+};
+
+/** Keep only the "NNN/YYYY" part, converting Thai digits to Arabic. */
+function normalizeDecisionNumber(value: string): string {
+  const arabic = value
+    .trim()
+    .replace(/[๐-๙]/g, (d) => String("๐๑๒๓๔๕๖๗๘๙".indexOf(d)));
+  const match = arabic.match(/\d+\s*\/\s*\d+/);
+  return match ? match[0].replace(/\s+/g, "") : arabic;
+}
+
 /**
  * Opens the Supreme Court's own search page in a new tab and submits
  * the decision number through its search form. This is a manual review link;
@@ -22,7 +57,12 @@ export default function OfficialDekaSearchButton({
       rel="noreferrer"
       className={className}
     >
-      <input type="hidden" name="word" value={decisionNumber} />
+      {Object.entries({
+        ...OFFICIAL_SEARCH_DEFAULTS,
+        search_deka_no: normalizeDecisionNumber(decisionNumber),
+      }).map(([name, value]) => (
+        <input key={name} type="hidden" name={name} value={value} />
+      ))}
       <button
         type="submit"
         className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 transition-colors hover:border-emerald-300 hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"

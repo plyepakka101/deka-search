@@ -3,7 +3,7 @@ import Link from "next/link";
 import PopularSearches from "@/components/PopularSearches";
 import { prisma } from "@/lib/prisma";
 
-export const revalidate = 3600; // Cache homepage on edge/server for 1 hour
+export const revalidate = 0; // Always read the latest decision count from the database
 
 export default async function Home() {
   const totalDecisions = await prisma.decision.count();

@@ -6,10 +6,25 @@ import { sortSectionsAscending, compareSectionNumbers } from '@/utils/sectionSor
 let cachedBooks: LawBook[] = [];
 let cachedLaws: LawSection[] = [];
 let initPromise: Promise<void> | null = null;
+let isRevalidating = false;
 
 const IDB_NAME = 'thai_law_mate_cache';
 const IDB_STORE = 'laws_store';
-const IDB_KEY = 'parsed_laws_v2';
+const IDB_KEY = 'parsed_laws_v5';
+
+// Cross-tab synchronization
+if (typeof window !== 'undefined') {
+  try {
+    const channel = new BroadcastChannel('thai_law_mate_sync');
+    channel.onmessage = (event) => {
+      if (event.data === 'reload_laws') {
+        fetchFullLawsAndCache();
+      }
+    };
+  } catch {
+    // BroadcastChannel unsupported, fallback gracefully
+  }
+}
 
 async function getFromIndexedDB(): Promise<{ books: LawBook[]; laws: LawSection[] } | null> {
   if (typeof window === 'undefined' || !('indexedDB' in window)) return null;
@@ -57,27 +72,129 @@ async function saveToIndexedDB(data: { books: LawBook[]; laws: LawSection[] }): 
   });
 }
 
-export const initLawsData = async () => {
-  if (cachedBooks.length > 0 && cachedLaws.length > 0) return;
-  if (initPromise) return initPromise;
+export const clearLawsCache = async (): Promise<void> => {
+  cachedBooks = [];
+  cachedLaws = [];
+  initPromise = null;
+  if (typeof window !== 'undefined' && 'indexedDB' in window) {
+    await new Promise<void>((resolve) => {
+      try {
+        const request = indexedDB.open(IDB_NAME, 1);
+        request.onsuccess = (e: any) => {
+          const db = e.target.result;
+          if (db.objectStoreNames.contains(IDB_STORE)) {
+            const tx = db.transaction(IDB_STORE, 'readwrite');
+            const store = tx.objectStore(IDB_STORE);
+            store.delete(IDB_KEY);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => resolve();
+          } else {
+            resolve();
+          }
+        };
+        request.onerror = () => resolve();
+      } catch {
+        resolve();
+      }
+    });
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('laws-data-updated'));
+    try {
+      const channel = new BroadcastChannel('thai_law_mate_sync');
+      channel.postMessage('reload_laws');
+      channel.close();
+    } catch {}
+  }
+};
 
-  initPromise = (async () => {
-    // 1. Try reading instantly from IndexedDB cache
-    const idbCached = await getFromIndexedDB();
-    if (idbCached && Array.isArray(idbCached.books) && Array.isArray(idbCached.laws) && idbCached.laws.length > 0) {
-      cachedBooks = idbCached.books;
-      cachedLaws = idbCached.laws;
-      return;
-    }
-
-    // 2. Fallback to API if not cached yet
-    const res = await fetch('/api/laws/books?includeContent=true');
+async function fetchFullLawsAndCache(onUpdate?: () => void): Promise<void> {
+  try {
+    const res = await fetch(`/api/laws/books?includeContent=true&nocache=true&_t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) return;
     const books = await res.json();
     cachedBooks = books;
     cachedLaws = books.flatMap((book: any) => parseLaws(book.content, book.id, book.name));
+    await saveToIndexedDB({ books: cachedBooks, laws: cachedLaws });
+    if (onUpdate) onUpdate();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('laws-data-updated'));
+    }
+  } catch (err) {
+    console.error('Failed to fetch full laws:', err);
+  }
+}
 
-    // Save to IndexedDB in background
-    saveToIndexedDB({ books: cachedBooks, laws: cachedLaws }).catch(() => {});
+async function checkServerUpdates(onUpdate?: () => void): Promise<void> {
+  if (isRevalidating || typeof window === 'undefined') return;
+  isRevalidating = true;
+  try {
+    const metaRes = await fetch(`/api/laws/books?_t=${Date.now()}`, { cache: 'no-store' });
+    if (!metaRes.ok) return;
+    const serverBooks: Array<{ id: string; name: string; updatedAt?: string; lastUpdated?: string }> = await metaRes.json();
+    
+    // Check if books count or IDs or updatedAt/lastUpdated changed
+    let hasChanges = false;
+    if (serverBooks.length !== cachedBooks.length) {
+      hasChanges = true;
+    } else {
+      const cachedMap = new Map(cachedBooks.map(b => [b.id, b]));
+      for (const sb of serverBooks) {
+        const cb = cachedMap.get(sb.id);
+        if (!cb || cb.name !== sb.name || cb.lastUpdated !== sb.lastUpdated || (sb.updatedAt && (cb as any).updatedAt !== sb.updatedAt)) {
+          hasChanges = true;
+          break;
+        }
+      }
+    }
+
+    if (hasChanges) {
+      await fetchFullLawsAndCache(onUpdate);
+    }
+  } catch {
+    // Offline or network error, keep current data
+  } finally {
+    isRevalidating = false;
+  }
+}
+
+export const initLawsData = async (forceRefresh?: boolean, onUpdate?: () => void) => {
+  if (forceRefresh) {
+    cachedBooks = [];
+    cachedLaws = [];
+    initPromise = null;
+  }
+
+  // If already loaded in memory and not forcing refresh, still run background check
+  if (!forceRefresh && cachedBooks.length > 0 && cachedLaws.length > 0) {
+    checkServerUpdates(onUpdate);
+    return;
+  }
+
+  if (initPromise) return initPromise;
+
+  initPromise = (async () => {
+    let hasLoadedFromCache = false;
+
+    // 1. Try reading instantly from IndexedDB cache (0ms latency for smooth experience)
+    if (!forceRefresh) {
+      const idbCached = await getFromIndexedDB();
+      if (idbCached && Array.isArray(idbCached.books) && Array.isArray(idbCached.laws) && idbCached.laws.length > 0) {
+        cachedBooks = idbCached.books;
+        cachedLaws = idbCached.laws;
+        hasLoadedFromCache = true;
+        if (onUpdate) onUpdate();
+      }
+    }
+
+    // 2. If nothing was cached yet, fetch immediately
+    if (!hasLoadedFromCache) {
+      await fetchFullLawsAndCache(onUpdate);
+      return;
+    }
+
+    // 3. Stale-While-Revalidate: check server in background and update if new laws were added/edited
+    checkServerUpdates(onUpdate);
   })().finally(() => {
     initPromise = null;
   });
@@ -199,11 +316,12 @@ export const saveNote = (note: UserNote, lawInfo?: { sectionNumber?: string; boo
   if (typeof window === 'undefined') return {};
   const notes = getNotes();
   
-  const hasText = note.text && note.text.trim().length > 0;
-  const hasHighlight = note.isHighlighted;
-  const hasTextHighlights = note.textHighlights && note.textHighlights.length > 0;
+  const hasText = Boolean(note.text && note.text.trim().length > 0);
+  const hasHighlight = Boolean(note.isHighlighted);
+  const hasTextHighlights = Boolean(note.textHighlights && note.textHighlights.length > 0);
+  const hasLinkedDekas = Boolean(note.linkedDekaIds && note.linkedDekaIds.length > 0);
 
-  if (!hasText && !hasHighlight && !hasTextHighlights) {
+  if (!hasText && !hasHighlight && !hasTextHighlights && !hasLinkedDekas) {
     delete notes[note.sectionId];
   } else {
     notes[note.sectionId] = note;
@@ -221,8 +339,10 @@ export const saveNote = (note: UserNote, lawInfo?: { sectionNumber?: string; boo
         sectionNumber: lawInfo?.sectionNumber,
         title: lawInfo?.title,
         note: note.text,
-        isHighlighted: Boolean(note.isHighlighted),
-        action: note.isHighlighted ? 'upsert' : 'delete'
+        isHighlighted: hasHighlight,
+        linkedDekaIds: note.linkedDekaIds || [],
+        textHighlights: note.textHighlights || [],
+        action: (hasText || hasHighlight || hasTextHighlights || hasLinkedDekas) ? 'upsert' : 'delete'
       })
     }).catch(() => {});
   } catch (e) {
@@ -235,31 +355,54 @@ export const saveNote = (note: UserNote, lawInfo?: { sectionNumber?: string; boo
 export const syncAdminImportantSections = async () => {
   if (typeof window === 'undefined') return;
   try {
-    const res = await fetch('/api/laws/important-sections');
+    const res = await fetch('/api/laws/important-sections', { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
       if (data.isAdmin && Array.isArray(data.sections)) {
         const notes = getNotes();
         let changed = false;
         for (const sec of data.sections) {
-          if (!notes[sec.id]) {
+          const existing = notes[sec.id];
+          if (!existing) {
             notes[sec.id] = {
               sectionId: sec.id,
               text: sec.note || '',
               updatedAt: Date.now(),
-              isHighlighted: true
+              isHighlighted: Boolean(sec.isHighlighted),
+              linkedDekaIds: sec.linkedDekaIds || [],
+              textHighlights: sec.textHighlights || []
             };
             changed = true;
-          } else if (!notes[sec.id].isHighlighted) {
-            notes[sec.id].isHighlighted = true;
-            if (sec.note && !notes[sec.id].text) {
-              notes[sec.id].text = sec.note;
+          } else {
+            let noteChanged = false;
+            if (sec.isHighlighted !== undefined && existing.isHighlighted !== sec.isHighlighted) {
+              existing.isHighlighted = sec.isHighlighted;
+              noteChanged = true;
             }
-            changed = true;
+            if (sec.note && existing.text !== sec.note) {
+              existing.text = sec.note;
+              noteChanged = true;
+            }
+            if (Array.isArray(sec.linkedDekaIds) && sec.linkedDekaIds.length > 0) {
+              const currentDekas = existing.linkedDekaIds || [];
+              const mergedDekas = Array.from(new Set([...currentDekas, ...sec.linkedDekaIds]));
+              if (mergedDekas.length !== currentDekas.length) {
+                existing.linkedDekaIds = mergedDekas;
+                noteChanged = true;
+              }
+            }
+            if (Array.isArray(sec.textHighlights) && sec.textHighlights.length > 0) {
+              existing.textHighlights = sec.textHighlights;
+              noteChanged = true;
+            }
+            if (noteChanged) {
+              changed = true;
+            }
           }
         }
         if (changed) {
           localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+          window.dispatchEvent(new CustomEvent('laws-notes-updated'));
         }
       }
     }
@@ -498,10 +641,21 @@ export const resetData = (options?: { resetNotes?: boolean; resetLaws?: boolean;
 };
 
 export const getSettings = (): AppSettings => {
-  if (typeof window === 'undefined') return { darkMode: false, fontSize: 2, fontStyle: 'modern', lineHeight: 1.8, voiceURI: '', speakingRate: 1.0 };
+  if (typeof window === 'undefined')
+    return {
+      darkMode: false,
+      fontSize: 2,
+      fontStyle: 'modern',
+      lineHeight: 1.8,
+      voiceURI: '',
+      speakingRate: 1.0,
+      ttsProvider: 'google',
+    };
   const stored = localStorage.getItem(SETTINGS_KEY);
   if (stored) {
-    return JSON.parse(stored);
+    const parsed = JSON.parse(stored);
+    if (!parsed.ttsProvider) parsed.ttsProvider = 'google';
+    return parsed;
   }
   return {
     darkMode: false,
@@ -509,7 +663,8 @@ export const getSettings = (): AppSettings => {
     fontStyle: 'modern',
     lineHeight: 1.8,
     voiceURI: '',
-    speakingRate: 1.0
+    speakingRate: 1.0,
+    ttsProvider: 'google',
   };
 };
 

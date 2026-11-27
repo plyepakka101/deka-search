@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 
 export async function GET() {
   try {
+    const session = await auth();
+    // @ts-ignore
+    if (!session?.user?.isAdmin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const history = await prisma.importBatch.findMany({
       orderBy: { importedAt: 'desc' },
       take: 50
@@ -17,6 +24,12 @@ export async function GET() {
 
 export async function DELETE(req: Request) {
   try {
+    const session = await auth();
+    // @ts-ignore
+    if (!session?.user?.isAdmin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 

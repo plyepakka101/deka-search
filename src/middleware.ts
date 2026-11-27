@@ -3,7 +3,7 @@ import { auth } from '@/auth';
 import { NextResponse } from 'next/server';
 
 export default auth((req) => {
-  const isAdminPath = req.nextUrl.pathname.startsWith('/admin') || req.nextUrl.pathname.startsWith('/api/admin') || req.nextUrl.pathname === '/api/import';
+  const isAdminPath = req.nextUrl.pathname.startsWith('/admin') || req.nextUrl.pathname.startsWith('/api/admin') || req.nextUrl.pathname.startsWith('/api/import');
   // @ts-ignore
   const isAdmin = !!req.auth?.user?.isAdmin;
 

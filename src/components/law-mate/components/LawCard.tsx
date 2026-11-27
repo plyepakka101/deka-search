@@ -1,11 +1,24 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { LawSection, UserNote, AppSettings, TextHighlight } from '../types';
 import { getOriginalLaw, getBooks } from '../services/dataService';
-import { BookOpen, Edit, Save, Trash2, ExternalLink, Star, Share2, Volume2, Square, Scale, History, Search, Highlighter, X, Brain, Play, GraduationCap, ChevronRight } from 'lucide-react';
+import { BookOpen, Edit, Save, Trash2, ExternalLink, Star, Share2, Volume2, Square, Scale, History, Search, Highlighter, X, Brain, Play, GraduationCap, ChevronRight, Folder, Check } from 'lucide-react';
 import { SECTION_REF_REGEX, thaiToArabic, createHighlightRegex } from '../utils/textUtils';
 import { DiffView } from './DiffView';
 import { MemorizePlayer } from './MemorizePlayer';
-import { addSectionToDeck, removeItem, getLocalItems, onMemorizeDataChanged } from '../services/memorizeService';
+import { normalizeLawTextForTTS } from '@/lib/lawPhonetics';
+import {
+  DEFAULT_AZURE_VOICE,
+  getAudioUrl,
+  isAzureUnavailable,
+  pickBrowserVoice,
+  playAudioUrl,
+  resetAudio,
+  unlockAudio,
+} from '@/lib/tts';
+import { 
+  addSectionToDeck, removeItem, getLocalItems, onMemorizeDataChanged, 
+  markSectionMastery, getUserFolders, getSectionFolders, toggleSectionInFolder, saveDeck 
+} from '../services/memorizeService';
 
 interface LawCardProps {
   law: LawSection;
@@ -34,6 +47,8 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
   
   // Refs for TTS management
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const playTokenRef = useRef(0);
   const isLoopingRef = useRef(false);
 
   // Highlighting State
@@ -76,14 +91,37 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
   const [memoItems, setMemoItems] = useState(getLocalItems());
   const [showQuickMemorizeModal, setShowQuickMemorizeModal] = useState(false);
 
+  // Custom Folders State
+  const [showFolderModal, setShowFolderModal] = useState(false);
+  const [userFolders, setUserFolders] = useState(getUserFolders());
+  const [sectionFolders, setSectionFolders] = useState(getSectionFolders(law.id));
+  const [newFolderName, setNewFolderName] = useState('');
+
   useEffect(() => {
+    setUserFolders(getUserFolders());
+    setSectionFolders(getSectionFolders(law.id));
     return onMemorizeDataChanged(() => {
       setMemoItems(getLocalItems());
+      setUserFolders(getUserFolders());
+      setSectionFolders(getSectionFolders(law.id));
     });
-  }, []);
+  }, [law.id]);
 
   const existingMemoItem = memoItems.find(i => i.sectionId === law.id);
   const isInMemo = Boolean(existingMemoItem);
+  const isMastered = Boolean(
+    existingMemoItem && (
+      existingMemoItem.status === 'mastered' || 
+      (typeof existingMemoItem.lastQuality === 'number' && existingMemoItem.lastQuality >= 3)
+    )
+  );
+  const isNeedReview = Boolean(
+    existingMemoItem && (
+      existingMemoItem.status === 'learning' || 
+      existingMemoItem.lastQuality === 1 || 
+      existingMemoItem.lastQuality === 2
+    )
+  );
 
   const handleToggleMemorize = async () => {
     if (existingMemoItem) {
@@ -94,6 +132,31 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
     }
     const targetDeckId = `deck-${law.bookId || 'crim'}`;
     await addSectionToDeck(targetDeckId, law.id, `มาตรา ${law.sectionNumber}`);
+  };
+
+  const handleMarkMastery = async (remembered: boolean) => {
+    await markSectionMastery(law.id, law.bookId, remembered, `มาตรา ${law.sectionNumber}`);
+  };
+
+  const handleToggleFolder = async (folderId: string) => {
+    await toggleSectionInFolder(folderId, law.id, `มาตรา ${law.sectionNumber}`);
+    setUserFolders(getUserFolders());
+    setSectionFolders(getSectionFolders(law.id));
+  };
+
+  const handleCreateFolderAndAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFolderName.trim()) return;
+    const folderId = await saveDeck({
+      name: newFolderName.trim(),
+      color: 'bg-amber-600'
+    });
+    if (folderId) {
+      await addSectionToDeck(folderId, law.id, `มาตรา ${law.sectionNumber}`);
+      setNewFolderName('');
+      setUserFolders(getUserFolders());
+      setSectionFolders(getSectionFolders(law.id));
+    }
   };
 
   const handleOpenQuickMemorize = async () => {
@@ -125,6 +188,8 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
 
   // Stop TTS when law changes or component unmounts
   useEffect(() => {
+    playTokenRef.current += 1;
+    resetAudio(audioRef.current);
     window.speechSynthesis.cancel();
     setIsPlaying(false);
     isLoopingRef.current = false;
@@ -141,7 +206,9 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
     }
 
     return () => {
-      window.speechSynthesis.cancel();
+      playTokenRef.current += 1;
+    resetAudio(audioRef.current);
+    window.speechSynthesis.cancel();
     };
   }, []);
 
@@ -190,74 +257,122 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
       if (!lawName && law.category) {
           lawName = law.category.split(' > ')[0];
       }
-      const cleanSection = thaiToArabic(law.sectionNumber).trim().replace(/\s+/g, '');
+      const cleanSection = thaiToArabic(law.sectionNumber).trim().replace(/\s+/g, ' ');
       window.location.href = `/search?tab=law&law_name=${encodeURIComponent(lawName)}&section=${encodeURIComponent(cleanSection)}`;
   }
+
+  const playBrowserTTS = useCallback((textToSpeak: string) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      alert('เบราว์เซอร์ของคุณไม่รองรับการอ่านออกเสียง');
+      setIsPlaying(false);
+      return;
+    }
+
+    playTokenRef.current += 1;
+    resetAudio(audioRef.current);
+    window.speechSynthesis.cancel();
+
+    const cleanText = normalizeLawTextForTTS(textToSpeak);
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = settings.speakingRate || 1.0;
+
+    const voices = window.speechSynthesis.getVoices();
+    const selectedVoice = pickBrowserVoice(voices, settings.voiceURI);
+
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+    } else {
+      utterance.lang = 'th-TH';
+    }
+
+    utterance.onstart = () => {
+      setIsPlaying(true);
+    };
+
+    utterance.onend = () => {
+      if (isLoopingRef.current) {
+        startReading();
+      } else {
+        setIsPlaying(false);
+        utteranceRef.current = null;
+      }
+    };
+
+    utterance.onerror = (e: any) => {
+      if (e.error === 'canceled' || e.error === 'interrupted') {
+        setIsPlaying(false);
+        utteranceRef.current = null;
+        return;
+      }
+      console.warn('Browser TTS error:', e);
+      setIsPlaying(false);
+      utteranceRef.current = null;
+      isLoopingRef.current = false;
+    };
+
+    utteranceRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+  }, [settings.speakingRate, settings.voiceURI]);
 
   const startReading = useCallback(() => {
     const cleanSection = thaiToArabic(law.sectionNumber);
     // Remove citation brackets like [1] from speech
     const cleanContent = law.content.replace(/\[\d+\]/g, '');
     const textToRead = `มาตรา ${cleanSection}. ${cleanContent}`;
-    
-    const utterance = new SpeechSynthesisUtterance(textToRead);
-    utterance.rate = settings.speakingRate || 1.0;
+    const provider = settings.ttsProvider || 'google';
 
-    const voices = window.speechSynthesis.getVoices();
-    let selectedVoice = null;
-
-    // If user selected a specific voice, try to find it
-    if (settings.voiceURI) {
-        selectedVoice = voices.find(v => v.voiceURI === settings.voiceURI);
+    if (
+      provider === 'browser' ||
+      (provider === 'azure' && isAzureUnavailable()) ||
+      typeof window === 'undefined'
+    ) {
+      playBrowserTTS(textToRead);
+      return;
     }
 
-    // If no specific voice selected or found, try to find a Thai voice
-    if (!selectedVoice) {
-        selectedVoice = voices.find(v => v.lang === 'th-TH') || voices.find(v => v.lang.includes('th'));
-    }
-    
-    if (selectedVoice) {
-        utterance.voice = selectedVoice;
-    } else {
-        // If still no voice, leave it default (browser default) but set lang just in case
-        utterance.lang = 'th-TH';
+    const token = ++playTokenRef.current;
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
     }
 
-    utterance.onstart = () => {
-        setIsPlaying(true);
-    };
+    const el = audioRef.current ?? new Audio();
+    audioRef.current = el;
+    resetAudio(el);
+    unlockAudio(el);
+    setIsPlaying(true);
 
-    utterance.onend = () => {
-        if (isLoopingRef.current) {
-            startReading(); // Loop again
-        } else {
-            setIsPlaying(false);
-            utteranceRef.current = null;
-        }
-    };
+    const rate = settings.speakingRate || 1.0;
+    const voice = settings.azureVoice || DEFAULT_AZURE_VOICE;
 
-    utterance.onerror = (e: any) => {
-        // Filter out canceled/interrupted errors which are normal
-        if (e.error === 'canceled' || e.error === 'interrupted') {
-            setIsPlaying(false);
-            utteranceRef.current = null;
-            return;
-        }
-        
-        console.error('TTS Error:', e.error);
-        // Prevent alert loop
-        if (!isLoopingRef.current) {
-            alert(`เกิดข้อผิดพลาดในการอ่านออกเสียง: ${e.error}`);
-        }
-        
-        setIsPlaying(false);
-        utteranceRef.current = null;
-        isLoopingRef.current = false;
-    };
-
-    utteranceRef.current = utterance;
-    window.speechSynthesis.speak(utterance);
-  }, [law, settings.voiceURI, settings.speakingRate]);
+    getAudioUrl(textToRead, voice, rate, provider)
+      .then(url => {
+        if (token !== playTokenRef.current) return;
+        return playAudioUrl(
+          el,
+          url,
+          {
+            onEnded: () => {
+              if (token !== playTokenRef.current) return;
+              if (isLoopingRef.current) {
+                startReading();
+              } else {
+                setIsPlaying(false);
+              }
+            },
+            onError: () => {
+              if (token !== playTokenRef.current) return;
+              playBrowserTTS(textToRead);
+            },
+          },
+          rate
+        );
+      })
+      .catch(err => {
+        if (token !== playTokenRef.current) return;
+        console.warn(`${provider} TTS failed, using browser voice fallback:`, err);
+        playBrowserTTS(textToRead);
+      });
+  }, [law, settings, playBrowserTTS]);
 
   const handlePlayTTS = () => {
     if (!('speechSynthesis' in window)) {
@@ -267,11 +382,15 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
 
     if (isPlaying) {
       isLoopingRef.current = false;
-      window.speechSynthesis.cancel();
+      playTokenRef.current += 1;
+    resetAudio(audioRef.current);
+    window.speechSynthesis.cancel();
       setIsPlaying(false);
     } else {
       // Stop any current speech before starting
-      window.speechSynthesis.cancel();
+      playTokenRef.current += 1;
+    resetAudio(audioRef.current);
+    window.speechSynthesis.cancel();
       isLoopingRef.current = true;
       startReading();
     }
@@ -604,6 +723,7 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
                       }}
                     >
                      มาตรา {law.sectionNumber}
+                     {law.title ? <span className="text-sm font-normal text-slate-500 dark:text-slate-400 ml-1.5">({law.title})</span> : null}
                     </span>
                 )}
                 {renderSegments}
@@ -679,6 +799,28 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
                         <span>ในชุดท่องสอบ</span>
                     </span>
                 )}
+                {isMastered && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 font-bold flex items-center gap-1 shadow-xs">
+                        <span>🟢 จำได้แล้ว</span>
+                        {existingMemoItem?.streak ? <span className="opacity-75">({existingMemoItem.streak})</span> : null}
+                    </span>
+                )}
+                {isNeedReview && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/70 text-rose-700 dark:text-rose-300 font-bold flex items-center gap-1 shadow-xs">
+                        <span>🔴 ยังจำไม่ได้</span>
+                    </span>
+                )}
+                {sectionFolders.map(f => (
+                    <span 
+                      key={f.id} 
+                      onClick={() => setShowFolderModal(true)}
+                      className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-bold border border-amber-200 dark:border-amber-800 flex items-center gap-1 shadow-2xs cursor-pointer hover:bg-amber-100 transition"
+                      title={`อยู่ในโฟลเดอร์: ${f.name} (คลิกเพื่อจัดการ)`}
+                    >
+                        <Folder size={10} />
+                        <span>{f.name}</span>
+                    </span>
+                ))}
            </div>
         </div>
         
@@ -812,6 +954,54 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
               <span>เริ่มท่อง</span>
             </button>
           </div>
+
+          {/* Quick Mastery Assessment Toggle (Active Recall) */}
+          <div className="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-0.5 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => handleMarkMastery(false)}
+              className={`flex items-center space-x-1 text-xs px-2.5 py-1.5 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${
+                isNeedReview
+                  ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 font-bold border border-rose-300 dark:border-rose-800'
+                  : 'text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:text-slate-400 dark:hover:bg-slate-800'
+              }`}
+              title={isNeedReview ? "บันทึกว่ายังจำไม่ได้ (กดเพื่อบันทึกซ้ำ)" : "ทำเครื่องหมายว่ายังจำไม่ได้ (ต้องการทบทวน)"}
+            >
+              <span>🔴</span>
+              <span>จำไม่ได้</span>
+            </button>
+
+            <div className="w-[1px] h-3.5 bg-slate-200 dark:bg-slate-800 mx-0.5" />
+
+            <button
+              type="button"
+              onClick={() => handleMarkMastery(true)}
+              className={`flex items-center space-x-1 text-xs px-2.5 py-1.5 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${
+                isMastered
+                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-800'
+                  : 'text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:text-slate-400 dark:hover:bg-slate-800'
+              }`}
+              title={isMastered ? `จำได้แล้ว (Streak ${existingMemoItem?.streak || 1})` : "ทำเครื่องหมายว่าจำได้แล้ว"}
+            >
+              <span>🟢</span>
+              <span>จำได้</span>
+            </button>
+          </div>
+
+          {/* Custom Folder Management Button */}
+          <button 
+            type="button"
+            onClick={() => setShowFolderModal(true)}
+            className={`flex items-center space-x-1.5 text-xs sm:text-sm px-3 py-1.5 rounded-xl border transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${
+              sectionFolders.length > 0 
+                ? 'text-amber-800 bg-amber-50 border-amber-300 dark:text-amber-300 dark:bg-amber-950/60 dark:border-amber-800 font-bold' 
+                : 'text-slate-600 dark:text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-800'
+            }`}
+            title="จัดเก็บมาตรานี้ลงในโฟลเดอร์ของฉัน (เพลย์ลิสต์ส่วนตัว)"
+          >
+            <Folder size={15} className={sectionFolders.length > 0 ? "text-amber-600 dark:text-amber-400" : ""} />
+            <span>{sectionFolders.length > 0 ? `โฟลเดอร์ (${sectionFolders.length})` : 'โฟลเดอร์'}</span>
+          </button>
 
           {/* Related Exams Button */}
           <button 
@@ -1020,6 +1210,92 @@ export const LawCard: React.FC<LawCardProps> = ({ law, note, settings, onSaveNot
               onFinish={() => setShowQuickMemorizeModal(false)}
               onBack={() => setShowQuickMemorizeModal(false)}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Custom Folder Management Modal */}
+      {showFolderModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <Folder className="text-amber-600 dark:text-amber-400" size={20} />
+                <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                  จัดเก็บในโฟลเดอร์ของฉัน
+                </h3>
+              </div>
+              <button 
+                onClick={() => setShowFolderModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+              เลือกโฟลเดอร์ที่ต้องการจัดเก็บ <span className="font-bold text-slate-700 dark:text-slate-200">มาตรา {law.sectionNumber}</span> เพื่อใช้ฝึกท่องหรือฟังวนลูป:
+            </div>
+
+            {/* Folder list */}
+            <div className="max-h-56 overflow-y-auto space-y-1.5">
+              {userFolders.length === 0 ? (
+                <div className="py-6 text-center text-xs text-slate-400 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
+                  ยังไม่มีโฟลเดอร์ส่วนตัว สร้างโฟลเดอร์แรกของคุณได้ด้านล่างนี้
+                </div>
+              ) : (
+                userFolders.map(folder => {
+                  const isInFolder = sectionFolders.some(f => f.id === folder.id);
+                  return (
+                    <button
+                      key={folder.id}
+                      type="button"
+                      onClick={() => handleToggleFolder(folder.id)}
+                      className={`w-full py-2.5 px-3 rounded-xl flex items-center justify-between transition cursor-pointer text-xs font-semibold ${
+                        isInFolder 
+                          ? 'bg-amber-50 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200 border border-amber-300 dark:border-amber-800 shadow-2xs'
+                          : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-100 dark:border-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <Folder size={15} className={isInFolder ? "text-amber-600 dark:text-amber-400 shrink-0" : "text-slate-400 shrink-0"} />
+                        <span className="truncate">{folder.name}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0 pl-2">
+                        {isInFolder ? (
+                          <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold text-[11px]">
+                            <Check size={14} />
+                            <span>อยู่ในโฟลเดอร์</span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-[11px]">
+                            + เพิ่มเข้า
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Inline new folder creation */}
+            <form onSubmit={handleCreateFolderAndAdd} className="pt-2 border-t dark:border-slate-800 flex gap-2">
+              <input
+                type="text"
+                value={newFolderName}
+                onChange={e => setNewFolderName(e.target.value)}
+                placeholder="สร้างโฟลเดอร์ใหม่ เช่น เนติ ขาอาญา..."
+                className="flex-1 px-3 py-2 rounded-xl border dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100 outline-none focus:border-amber-500"
+              />
+              <button
+                type="submit"
+                disabled={!newFolderName.trim()}
+                className="px-3 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer shadow-2xs"
+              >
+                สร้างและจัดเก็บ
+              </button>
+            </form>
           </div>
         </div>
       )}

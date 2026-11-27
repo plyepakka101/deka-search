@@ -40,7 +40,16 @@ import {
   DEFAULT_EXPORT_OPTIONS,
   ImportSummary,
 } from "@/components/law-mate/services/dataService";
-import { AppSettings, ExportOptions } from "@/components/law-mate/types";
+import { AppSettings, ExportOptions, TtsProvider } from "@/components/law-mate/types";
+import {
+  AZURE_THAI_VOICES,
+  DEFAULT_AZURE_VOICE,
+  getAudioUrl,
+  isAzureUnavailable,
+  normalizeLawTextForTTS,
+  pickBrowserVoice,
+  unlockAudio,
+} from "@/lib/tts";
 
 export default function SettingsPage() {
   const [session, setSession] = useState<any>(null);
@@ -58,6 +67,7 @@ export default function SettingsPage() {
     lineHeight: 1.8,
     voiceURI: "",
     speakingRate: 1.0,
+    ttsProvider: "google",
   });
 
   // Export & counts
@@ -200,30 +210,58 @@ export default function SettingsPage() {
   };
 
   // TTS Test Voice
-  const handleTestVoice = () => {
+  const testText = "ทดสอบการอ่านออกเสียง มาตรา 90/1 ลหุโทษ (1) บุคคลอื่น ๆ หรือสถานที่ใด ๆ ตาม พ.ร.บ.ล้มละลาย";
+
+  const testBrowserVoice = () => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
       alert("เบราว์เซอร์นี้ไม่รองรับระบบอ่านออกเสียง");
       return;
     }
     window.speechSynthesis.cancel();
-    const testText = "ทดสอบการอ่านออกเสียง มาตรา 420 ผู้ใดจงใจหรือประมาทเลินเล่อ ทำต่อบุคคลอื่นโดยผิดกฎหมาย";
-    const utterance = new SpeechSynthesisUtterance(testText);
+    const cleanText = normalizeLawTextForTTS(testText);
+    const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.lang = "th-TH";
     utterance.rate = settings.speakingRate || 1.0;
 
-    if (settings.voiceURI) {
-      const selected = voices.find(v => v.voiceURI === settings.voiceURI);
-      if (selected) utterance.voice = selected;
-    } else {
-      const thaiVoice = voices.find(v => v.lang.includes("th"));
-      if (thaiVoice) utterance.voice = thaiVoice;
-    }
+    const selected = pickBrowserVoice(voices, settings.voiceURI);
+    if (selected) utterance.voice = selected;
 
     utterance.onstart = () => setIsPlayingTestVoice(true);
     utterance.onend = () => setIsPlayingTestVoice(false);
     utterance.onerror = () => setIsPlayingTestVoice(false);
 
     window.speechSynthesis.speak(utterance);
+  };
+
+  const handleTestVoice = () => {
+    const provider = settings.ttsProvider ?? "azure";
+    if (provider === "browser" || (provider === "azure" && isAzureUnavailable())) {
+      testBrowserVoice();
+      return;
+    }
+
+    if (typeof window !== "undefined") window.speechSynthesis?.cancel();
+    const audio = new Audio();
+    unlockAudio(audio); // keep the click gesture for mobile Safari
+    setIsPlayingTestVoice(true);
+
+    getAudioUrl(testText, settings.azureVoice || DEFAULT_AZURE_VOICE, settings.speakingRate || 1.0, provider)
+      .then(url => {
+        audio.onended = () => setIsPlayingTestVoice(false);
+        audio.onerror = () => {
+          setIsPlayingTestVoice(false);
+          testBrowserVoice();
+        };
+        audio.src = url;
+        audio.playbackRate = settings.speakingRate || 1.0;
+        return audio.play();
+      })
+      .catch(err => {
+        console.warn(`${provider} TTS test failed, using browser voice:`, err);
+        setIsPlayingTestVoice(false);
+        showToast("เสียงจากเซิร์ฟเวอร์ขัดข้อง ใช้เสียงของเบราว์เซอร์แทน");
+        testBrowserVoice();
+      });
   };
 
   // Export Data
@@ -509,10 +547,50 @@ export default function SettingsPage() {
               </p>
             </div>
 
-            {/* Voice Selection */}
+            {/* Provider Selection */}
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                เลือกเสียงภาษาไทย
+                แหล่งเสียงอ่าน
+              </label>
+              <select
+                value={settings.ttsProvider ?? "azure"}
+                onChange={(e) => updateSetting("ttsProvider", e.target.value as TtsProvider)}
+                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
+              >
+                <option value="azure">เสียงคุณภาพสูง (Azure Neural) — คมชัดสูงสุด ต้องเข้าสู่ระบบ</option>
+                <option value="edge">เสียง Edge-TTS (Premwadee / Niwat) — ฟรีผ่านเซิร์ฟเวอร์</option>
+                <option value="google">เสียง Google Cloud TTS — ฟรี ไม่จำกัด ไม่ต้องใช้คีย์</option>
+                <option value="browser">เสียงของเบราว์เซอร์ — ฟรี 100% ทำงานออฟไลน์ (ใน Edge เป็นเสียงธรรมชาติ)</option>
+              </select>
+              <p className="text-xs text-slate-400">
+                * หากแหล่งเสียงที่เลือกเกิดขัดข้อง ระบบจะสลับไปใช้เสียงสำรองให้อัตโนมัติอย่างราบรื่น
+              </p>
+            </div>
+
+            {/* Azure / Edge Neural Voice Selection */}
+            {((settings.ttsProvider ?? "azure") === "azure" || settings.ttsProvider === "edge") && (
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                  เลือกเสียงพากย์ (Neural Voice)
+                </label>
+                <select
+                  value={settings.azureVoice || DEFAULT_AZURE_VOICE}
+                  onChange={(e) => updateSetting("azureVoice", e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
+                >
+                  {AZURE_THAI_VOICES.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Browser Voice Selection */}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                เลือกเสียงภาษาไทยของเบราว์เซอร์
               </label>
               <select
                 value={settings.voiceURI || ""}
@@ -792,6 +870,25 @@ export default function SettingsPage() {
                     </div>
                     <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                       วิเคราะห์ข้อสอบ แยกประเด็นวินิจฉัย และเชื่อมมาตรา/ฎีกาอัตโนมัติ
+                    </div>
+                  </div>
+                </div>
+              </Link>
+
+              <Link
+                href="/admin/exam-categories"
+                className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-violet-500 dark:hover:border-violet-500 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-violet-50/30 dark:hover:bg-violet-950/20 transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-xl bg-violet-100 dark:bg-violet-900/50 text-violet-600 dark:text-violet-400 group-hover:scale-105 transition-transform">
+                    <GraduationCap className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-violet-600 transition-colors">
+                      จัดการหมวดข้อสอบ
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      เพิ่มหมวดกฎหมายใหม่ให้ฝึกทำข้อสอบและจำลองสอบ
                     </div>
                   </div>
                 </div>

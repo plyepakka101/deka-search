@@ -8,7 +8,22 @@ export async function GET(request: Request) {
     const session = await auth();
     const isAdmin = Boolean((session?.user as any)?.isAdmin);
     const { searchParams } = new URL(request.url);
+    const view = searchParams.get('view');
     const deckId = searchParams.get('deckId');
+
+    // Return custom decks created by Admin
+    if (view === 'decks') {
+      const decks = await prisma.adminDeck.findMany({
+        orderBy: { sortOrder: 'asc' },
+      });
+      return NextResponse.json({
+        success: true,
+        isAdmin,
+        decks,
+      }, {
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
+      });
+    }
 
     // Fetch items from DB
     const whereClause: any = {};
@@ -33,6 +48,7 @@ export async function GET(request: Request) {
       easeFactor: item.easeFactor,
       streak: item.streak,
       status: item.status as any,
+      masteryStatus: item.masteryStatus || undefined,
       nextReviewAt: item.nextReviewAt || undefined,
     })).sort((a: any, b: any) => {
       const secA = a.sectionNumber || a.title || '';
@@ -44,6 +60,8 @@ export async function GET(request: Request) {
       success: true,
       isAdmin,
       items: formatted,
+    }, {
+      headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
     });
   } catch (error: any) {
     console.error('Failed to fetch memorization items:', error);
@@ -72,8 +90,54 @@ export async function POST(request: Request) {
     }
 
     // Admin operations -> Persist to Turso Database
+    if (action === 'save_deck' && payload) {
+      const { id, name, description, color, sortOrder, isBuiltin } = payload;
+      if (!id || !name) {
+        return NextResponse.json({ success: false, error: 'Missing deck id or name' }, { status: 400 });
+      }
+
+      const savedDeck = await prisma.adminDeck.upsert({
+        where: { id },
+        update: {
+          name,
+          description: description || null,
+          color: color || null,
+          sortOrder: typeof sortOrder === 'number' ? sortOrder : 0,
+          isBuiltin: Boolean(isBuiltin),
+          updatedAt: new Date(),
+        },
+        create: {
+          id,
+          name,
+          description: description || null,
+          color: color || null,
+          sortOrder: typeof sortOrder === 'number' ? sortOrder : 0,
+          isBuiltin: Boolean(isBuiltin),
+        }
+      });
+
+      return NextResponse.json({
+        success: true,
+        savedToDb: true,
+        deck: savedDeck,
+        message: 'แอดมิน: บันทึกโฟลเดอร์/สำรับลงฐานข้อมูลเรียบร้อย',
+      });
+    }
+
+    if (action === 'delete_deck' && payload?.deckId) {
+      const { deckId } = payload;
+      await prisma.adminDeck.deleteMany({ where: { id: deckId } });
+      await prisma.adminMemorizeItem.deleteMany({ where: { deckId } });
+
+      return NextResponse.json({
+        success: true,
+        savedToDb: true,
+        message: 'แอดมิน: ลบโฟลเดอร์และมาตราในสำรับออกจากฐานข้อมูลเรียบร้อย',
+      });
+    }
+
     if (action === 'add_item') {
-      const { deckId, sectionId, title, sectionNumber, bookId } = payload;
+      const { deckId, sectionId, title, sectionNumber, bookId, masteryStatus } = payload;
       if (!deckId || !sectionId) {
         return NextResponse.json({ success: false, error: 'Missing deckId or sectionId' }, { status: 400 });
       }
@@ -85,6 +149,7 @@ export async function POST(request: Request) {
           title: title || `มาตรา ${sectionNumber || sectionId}`,
           sectionNumber: sectionNumber || null,
           bookId: bookId || null,
+          masteryStatus: masteryStatus || undefined,
           updatedAt: new Date(),
         },
         create: {
@@ -99,6 +164,7 @@ export async function POST(request: Request) {
           easeFactor: 2.5,
           streak: 0,
           status: 'new',
+          masteryStatus: masteryStatus || null,
           nextReviewAt: new Date().toISOString(),
         }
       });
@@ -128,8 +194,35 @@ export async function POST(request: Request) {
       });
     }
 
+    if (action === 'set_mastery') {
+      const { itemId, sectionId, masteryStatus } = payload;
+      if (itemId) {
+        await prisma.adminMemorizeItem.updateMany({
+          where: { id: itemId },
+          data: {
+            masteryStatus: masteryStatus || null,
+            updatedAt: new Date(),
+          }
+        });
+      } else if (sectionId) {
+        await prisma.adminMemorizeItem.updateMany({
+          where: { sectionId },
+          data: {
+            masteryStatus: masteryStatus || null,
+            updatedAt: new Date(),
+          }
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        savedToDb: true,
+        message: 'แอดมิน: อัปเดตสถานะจำได้/จำไม่ได้ลงฐานข้อมูลเรียบร้อย',
+      });
+    }
+
     if (action === 'review') {
-      const { itemId, quality, repetitions, intervalDays, easeFactor, streak, status, nextReviewAt } = payload;
+      const { itemId, quality, repetitions, intervalDays, easeFactor, streak, status, nextReviewAt, masteryStatus } = payload;
       if (itemId) {
         await prisma.adminMemorizeItem.updateMany({
           where: { id: itemId },
@@ -139,6 +232,7 @@ export async function POST(request: Request) {
             easeFactor: easeFactor ?? undefined,
             streak: streak ?? undefined,
             status: status ?? undefined,
+            masteryStatus: masteryStatus !== undefined ? masteryStatus : undefined,
             nextReviewAt: nextReviewAt ?? undefined,
             updatedAt: new Date(),
           }
@@ -167,6 +261,7 @@ export async function POST(request: Request) {
               easeFactor: it.easeFactor ?? 2.5,
               streak: it.streak ?? 0,
               status: it.status ?? 'new',
+              masteryStatus: it.masteryStatus || null,
               nextReviewAt: it.nextReviewAt || null,
               updatedAt: new Date(),
             },
@@ -182,6 +277,7 @@ export async function POST(request: Request) {
               easeFactor: it.easeFactor ?? 2.5,
               streak: it.streak ?? 0,
               status: it.status ?? 'new',
+              masteryStatus: it.masteryStatus || null,
               nextReviewAt: it.nextReviewAt || null,
             }
           });

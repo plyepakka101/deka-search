@@ -8,9 +8,16 @@ export const EXAM_CATEGORIES = [
   "รัฐธรรมนูญแห่งราชอาณาจักรไทย",
   "พยานแพ่ง",
   "พยานอาญา",
+  "พระราชบัญญัติจัดตั้งศาลแขวงและวิธีพิจารณาความอาญาในศาลแขวง พ.ศ. 2499",
 ] as const;
 
-export type ExamCategory = typeof EXAM_CATEGORIES[number];
+/**
+ * หมวดข้อสอบตั้งต้น (built-in) — แอดมินเพิ่มหมวดอื่นได้เองผ่านหน้า /admin/exam-categories
+ * หมวดที่แอดมินเพิ่มจะถูกเก็บในตาราง ExamCategoryDef และรวมกับรายการนี้ที่ GET /api/exams/categories
+ */
+export const DEFAULT_EXAM_CATEGORIES: readonly string[] = EXAM_CATEGORIES;
+
+export type ExamCategory = string;
 
 export interface ParsedExamQuestion {
   questionNumber: string;

@@ -119,6 +119,14 @@ export const BOOK_PRIORITY_ORDER: Record<string, number> = {
   'bankruptcy': 6,
   'kwaeng': 7,
   'court_const': 8,
+  'consumer_proc': 9,
+  'copyright': 10,
+  'labour_protection': 11,
+  'admin_court': 12,
+  'juvenile_court': 13,
+  'revenue': 14,
+  'narcotics': 15,
+  'traffic': 16,
 };
 
 /**

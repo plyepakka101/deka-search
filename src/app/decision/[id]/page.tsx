@@ -62,7 +62,8 @@ export default async function DecisionDetailPage({ params }: { params: Promise<{
             decisionNumber: decision.decisionNumber,
             decisionYear: decision.decisionYear,
             parties: decision.parties,
-            shortSummary: decision.shortSummary
+            shortSummary: decision.shortSummary,
+            law: decision.law
           }} className="bg-white border border-slate-200 shadow-sm" />
           <PrintButton title={decision.decisionNumber.replace(/\//g, "_")} />
         </div>

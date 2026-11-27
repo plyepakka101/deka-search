@@ -11,6 +11,7 @@ interface BookmarkButtonProps {
     decisionYear?: number | null;
     parties?: string | null;
     shortSummary?: string | null;
+    law?: string | null;
   };
   className?: string;
 }
