@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { EXAM_CATEGORIES } from '@/utils/examParser';
+import { getExamCategories } from '@/lib/examCategories';
 
 export async function GET(request: Request) {
   try {
@@ -64,10 +64,10 @@ export async function GET(request: Request) {
       })
     ]);
 
-    // Build category count dictionary
+    // Build category count dictionary (built-in + admin-defined categories)
     const categoryStats: Record<string, number> = {};
-    EXAM_CATEGORIES.forEach(cat => {
-      categoryStats[cat] = 0;
+    (await getExamCategories()).forEach(cat => {
+      categoryStats[cat.name] = 0;
     });
     categoryCounts.forEach(c => {
       categoryStats[c.category] = c._count.id;

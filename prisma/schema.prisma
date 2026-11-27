@@ -167,3 +167,11 @@ model AdminBookmark {
 
   @@index([decisionYear])
 }
+
+// หมวดข้อสอบที่แอดมินเพิ่มเอง (หมวดตั้งต้นอยู่ใน src/utils/examParser.ts)
+model ExamCategoryDef {
+  id        String   @id
+  name      String   @unique
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+}

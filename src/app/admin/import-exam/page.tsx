@@ -6,10 +6,12 @@ import {
   Upload, FileText, ChevronLeft, Check, AlertCircle, 
   Sparkles, BookOpen, Scale, Calendar, Eye, Save, Trash2, ArrowRight
 } from 'lucide-react';
-import { EXAM_CATEGORIES } from '@/utils/examParser';
+import { DEFAULT_EXAM_CATEGORIES } from '@/utils/examParser';
+import { useExamCategories } from '@/hooks/useExamCategories';
 
 export default function ImportExamPage() {
-  const [category, setCategory] = useState<string>(EXAM_CATEGORIES[5]); // Default: พ.ร.บ.ล้มละลาย
+  const examCategories = useExamCategories();
+  const [category, setCategory] = useState<string>(DEFAULT_EXAM_CATEGORIES[5]); // Default: พ.ร.บ.ล้มละลาย
   const [title, setTitle] = useState('');
   const [source, setSource] = useState('เนติบัณฑิตยสภา');
   const [year, setYear] = useState('');
@@ -191,14 +193,15 @@ export default function ImportExamPage() {
             {/* Category selection - 9 Categories */}
             <div className="space-y-1 md:col-span-2">
               <label className="text-sm font-semibold text-slate-700">
-                หมวดกฎหมาย (9 หมวดหลัก) <span className="text-rose-500">*</span>
+                หมวดกฎหมาย <span className="text-rose-500">*</span>
+                <Link href="/admin/exam-categories" className="ml-2 text-xs font-medium text-indigo-600 hover:underline">+ เพิ่ม/จัดการหมวด</Link>
               </label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               >
-                {EXAM_CATEGORIES.map((cat, idx) => (
+                {examCategories.map((cat, idx) => (
                   <option key={cat} value={cat}>
                     {idx + 1}. {cat}
                   </option>

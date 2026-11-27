@@ -9,7 +9,7 @@ import {
   RotateCcw, BookOpen, Bot, Award, Trophy, Scale, ShieldCheck,
   CheckSquare, Square, Eye, X, HelpCircle, ExternalLink, Key
 } from 'lucide-react';
-import { EXAM_CATEGORIES } from '@/utils/examParser';
+import { useExamCategories } from '@/hooks/useExamCategories';
 import { 
   saveSimulation, 
   saveExamAttempt, 
@@ -20,6 +20,7 @@ type Phase = 'setup' | 'testing' | 'review';
 
 export default function MockExamSimulationPage() {
   const router = useRouter();
+  const examCategories = useExamCategories();
 
   // Phase state
   const [phase, setPhase] = useState<Phase>('setup');
@@ -359,7 +360,7 @@ export default function MockExamSimulationPage() {
                   </div>
                 </button>
 
-                {EXAM_CATEGORIES.map((catName) => (
+                {examCategories.map((catName) => (
                   <button
                     key={catName}
                     type="button"
