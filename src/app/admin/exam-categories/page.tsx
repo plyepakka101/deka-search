@@ -48,7 +48,6 @@ export default function ExamCategoriesAdminPage() {
   }, []);
 
   const load = useCallback(async () => {
-    setIsLoading(true);
     try {
       const res = await fetch('/api/admin/exam-categories');
       const data = await res.json();
@@ -263,7 +262,7 @@ export default function ExamCategoriesAdminPage() {
 
       <div className="space-y-3">
         <div>
-          <h2 className="text-base font-bold text-slate-900">ข้อสอบรอจัดหมวด ("{UNCATEGORIZED_CATEGORY}")</h2>
+          <h2 className="text-base font-bold text-slate-900">ข้อสอบรอจัดหมวด (&quot;{UNCATEGORIZED_CATEGORY}&quot;)</h2>
           <p className="text-xs text-slate-500 mt-1">
             ข้อสอบที่ระบบตรวจไม่พบกฎหมายที่อ้างจะมาอยู่ที่นี่ เลือกหมวดที่ถูกต้องแล้วกดย้าย (ถ้ายังไม่มีหมวด ให้เพิ่มหมวดด้านบนก่อน)
           </p>
