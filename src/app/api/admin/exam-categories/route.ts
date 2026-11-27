@@ -60,7 +60,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'ไม่พบหมวดนี้ (หมวดตั้งต้นลบไม่ได้)' }, { status: 404 });
     }
     if (error?.message === 'IN_USE') {
-      return NextResponse.json({ error: 'ลบไม่ได้ เพราะยังมีข้อสอบหรือชุดข้อสอบอยู่ในหมวดนี้' }, { status: 409 });
+      return NextResponse.json({ error: 'ลบไม่ได้ เพราะยังมีข้อสอบอยู่ในหมวดนี้ (ย้ายข้อสอบไปหมวดอื่นก่อน)' }, { status: 409 });
     }
     console.error('Error deleting exam category:', error);
     return NextResponse.json({ error: 'ไม่สามารถลบหมวดได้' }, { status: 500 });

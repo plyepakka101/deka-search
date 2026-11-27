@@ -95,8 +95,7 @@ export async function deleteExamCategory(id: string) {
   const cat = await prisma.examCategoryDef.findUnique({ where: { id } });
   if (!cat) throw new Error('NOT_FOUND');
   const used = await prisma.examQuestion.count({ where: { category: cat.name } });
-  const usedCollections = await prisma.examCollection.count({ where: { category: cat.name } });
-  if (used > 0 || usedCollections > 0) {
+  if (used > 0) {
     throw new Error('IN_USE');
   }
   await prisma.examCategoryDef.delete({ where: { id } });
