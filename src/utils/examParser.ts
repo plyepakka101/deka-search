@@ -9,7 +9,11 @@ export const EXAM_CATEGORIES = [
   "พยานแพ่ง",
   "พยานอาญา",
   "พระราชบัญญัติจัดตั้งศาลแขวงและวิธีพิจารณาความอาญาในศาลแขวง พ.ศ. 2499",
+  "อื่นๆ",
 ] as const;
+
+/** หมวดสำรองสำหรับข้อสอบที่ตรวจไม่พบกฎหมาย — ให้แอดมินตรวจและย้ายไปหมวดที่ถูกต้อง */
+export const UNCATEGORIZED_CATEGORY = "อื่นๆ";
 
 /**
  * หมวดข้อสอบตั้งต้น (built-in) — แอดมินเพิ่มหมวดอื่นได้เองผ่านหน้า /admin/exam-categories
@@ -302,4 +306,80 @@ export function parseExamText(
     year: detectedYear,
     questions
   };
+}
+
+
+// -------------------------------------------------------------
+// Auto-categorization (จัดหมวดอัตโนมัติจากกฎหมายที่อ้างในข้อสอบ)
+// -------------------------------------------------------------
+
+/** รูปแบบชื่อกฎหมาย/ชื่อย่อ ที่ใช้ตรวจหมวดตั้งต้น (ไม่ครอบคลุมหมวดพยานแพ่ง/พยานอาญา ซึ่งเป็นหมวดตามเนื้อหา) */
+const BUILTIN_CATEGORY_PATTERNS: Record<string, RegExp[]> = {
+  "ประมวลกฎหมายแพ่งและพาณิชย์": [/ประมวลกฎหมายแพ่งและพาณิชย์/, /ป\.\s?พ\.\s?พ\./, /ประมวลแพ่งและพาณิชย์/],
+  "ประมวลกฎหมายอาญา": [/ประมวลกฎหมายอาญา/, /ป\.\s?อ\./, /ประมวลอาญา/],
+  "ประมวลกฎหมายวิธีพิจารณาความแพ่ง": [/ประมวลกฎหมายวิธีพิจารณาความแพ่ง/, /ป\.\s?วิ\.\s?พ\./, /ป\.\s?วิ\.\s?แพ่ง/],
+  "ประมวลกฎหมายวิธีพิจารณาความอาญา": [/ประมวลกฎหมายวิธีพิจารณาความอาญา/, /ป\.\s?วิ\.\s?อ\./, /ป\.\s?วิ\.\s?อาญา/],
+  "พระธรรมนูญศาลยุติธรรม": [/พระธรรมนูญศาลยุติธรรม/, /พ\.\s?ร\.\s?ธ\./],
+  "พระราชบัญญัติล้มละลาย พ.ศ. 2483": [/พระราชบัญญัติล้มละลาย/, /พ\.\s?ร\.\s?บ\.\s?ล้มละลาย/],
+  "รัฐธรรมนูญแห่งราชอาณาจักรไทย": [/รัฐธรรมนูญ/],
+  "พระราชบัญญัติจัดตั้งศาลแขวงและวิธีพิจารณาความอาญาในศาลแขวง พ.ศ. 2499": [
+    /จัดตั้งศาลแขวง/,
+    /พ\.\s?ร\.\s?บ\.\s?ศาลแขวง/,
+  ],
+};
+
+function compactText(text: string): string {
+  return thaiDigitsToArabic(text).replace(/\s+/g, '');
+}
+
+/** ตัดคำนำหน้า/ปี พ.ศ. ออกจากชื่อหมวด เพื่อใช้จับคู่ชื่อกฎหมายของหมวดที่แอดมินเพิ่มเอง */
+function categoryCoreName(category: string): string {
+  return compactText(category)
+    .replace(/^(พระราชบัญญัติ|พ\.ร\.บ\.|ประมวลกฎหมาย|พระราชกำหนด|พ\.ร\.ก\.)/, '')
+    .replace(/^จัดตั้ง/, '')
+    .replace(/พ\.ศ\.?\d{4}$/, '');
+}
+
+/**
+ * ตรวจว่าข้อสอบอ้างถึงกฎหมายฉบับใดบ้าง คืนชื่อหมวดทุกหมวดที่ตรง (ตามลำดับของ categories)
+ * ถ้าไม่พบเลย คืน [UNCATEGORIZED_CATEGORY]
+ */
+export function detectExamCategories(text: string, categories: readonly string[]): string[] {
+  const compact = compactText(text);
+  const found: string[] = [];
+
+  for (const cat of categories) {
+    if (cat === UNCATEGORIZED_CATEGORY) continue;
+
+    const patterns = BUILTIN_CATEGORY_PATTERNS[cat];
+    let matched = false;
+    if (patterns) {
+      matched = patterns.some((re) => re.test(compact));
+    } else {
+      const core = categoryCoreName(cat);
+      matched = core.length >= 4 && compact.includes(core);
+    }
+    if (matched) found.push(cat);
+  }
+
+  return found.length > 0 ? found : [UNCATEGORIZED_CATEGORY];
+}
+
+/** ลายนิ้วมือของข้อสอบ ใช้ตรวจข้อซ้ำ: เทียบข้อเท็จจริง+คำถาม โดยไม่สนช่องว่าง เครื่องหมาย และเลขไทย/อารบิก */
+export function examFingerprint(facts: string, prompt: string): string {
+  return thaiDigitsToArabic(`${facts}|${prompt}`)
+    .toLowerCase()
+    .replace(/[\s\u200b.,;:!?()\[\]{}"'“”‘’\-–—_/\\]+/g, '');
+}
+
+/** เปรียบเทียบเลขข้อแบบธรรมชาติ เช่น 7.2 < 7.10 */
+export function compareQuestionNumbers(a: string, b: string): number {
+  const pa = a.split('.').map((x) => parseInt(x, 10));
+  const pb = b.split('.').map((x) => parseInt(x, 10));
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = Number.isNaN(pa[i]) ? -1 : pa[i] ?? -1;
+    const y = Number.isNaN(pb[i]) ? -1 : pb[i] ?? -1;
+    if (x !== y) return x - y;
+  }
+  return a.localeCompare(b, 'th');
 }

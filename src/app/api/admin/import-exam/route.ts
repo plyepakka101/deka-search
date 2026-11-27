@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { parseExamText, ParsedExamQuestion } from '@/utils/examParser';
 import { auth } from '@/auth';
+import { getExamCategories } from '@/lib/examCategories';
+import { loadNextQuestionNumbers, planExamImport } from '@/lib/examImport';
+import { UNCATEGORIZED_CATEGORY } from '@/utils/examParser';
 
 const MAX_EXAM_RAW_TEXT = 5 * 1024 * 1024; // 5MB
 const MAX_QUESTIONS_PER_BATCH = 200;
@@ -15,6 +18,7 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { action, rawText, category, title, year, description, source, questions } = body;
+    const autoCategorize = body.autoCategorize === true;
 
     // 1. ACTION: PREVIEW
     if (action === 'preview') {
@@ -55,9 +59,21 @@ export async function POST(request: Request) {
 
       const matchedMap = new Map(matchedDecisions.map(d => [d.decisionNumber, d]));
 
-      // Attach matched details to each question
-      const enhancedQuestions = parsed.questions.map(q => ({
+      const categoryNames = (await getExamCategories()).map(c => c.name);
+      const manualCategory = category || 'พระราชบัญญัติล้มละลาย พ.ศ. 2483';
+      if (!autoCategorize && !categoryNames.includes(manualCategory)) {
+        return NextResponse.json({ error: 'ไม่พบหมวดที่เลือก' }, { status: 400 });
+      }
+      const plan = await planExamImport(parsed.questions, {
+        autoCategorize,
+        category: manualCategory,
+        categories: categoryNames,
+      });
+
+      // Attach matched details + target categories to each question
+      const enhancedQuestions = parsed.questions.map((q, qi) => ({
         ...q,
+        targets: plan[qi],
         dekaDetails: q.relatedDekas.map(dNum => ({
           number: dNum,
           matched: matchedMap.has(dNum),
@@ -74,6 +90,8 @@ export async function POST(request: Request) {
           description: description || null,
           source: source || 'เนติบัณฑิตยสภา',
           questionsCount: enhancedQuestions.length,
+          importCount: plan.flat().filter(t => !t.duplicate).length,
+          duplicateCount: plan.flat().filter(t => t.duplicate).length,
           matchedDekasCount: matchedDecisions.length,
           questions: enhancedQuestions
         }
@@ -82,7 +100,7 @@ export async function POST(request: Request) {
 
     // 2. ACTION: SAVE
     if (action === 'save') {
-      if (!title || !category || !Array.isArray(questions) || questions.length === 0) {
+      if (!title || !Array.isArray(questions) || questions.length === 0 || (!autoCategorize && !category)) {
         return NextResponse.json({ error: 'ข้อมูลชุดข้อสอบไม่ครบถ้วน' }, { status: 400 });
       }
 
@@ -90,37 +108,101 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: `จำนวนข้อสอบเกินขีดจำกัด (ไม่เกิน ${MAX_QUESTIONS_PER_BATCH} ข้อต่อชุด)` }, { status: 400 });
       }
 
+      const malformed = (questions as ParsedExamQuestion[]).some(
+        q => !q || typeof q.facts !== 'string' || typeof q.prompt !== 'string'
+      );
+      if (malformed) {
+        return NextResponse.json({ error: 'ข้อมูลข้อสอบไม่ถูกต้อง' }, { status: 400 });
+      }
+
+      const categoryNames = (await getExamCategories()).map(c => c.name);
+      if (!autoCategorize && !categoryNames.includes(category)) {
+        return NextResponse.json({ error: 'ไม่พบหมวดที่เลือก' }, { status: 400 });
+      }
+
+      // จัดหมวด + ตรวจข้อซ้ำใหม่ที่ฝั่งเซิร์ฟเวอร์ (ไม่เชื่อข้อมูลหมวดจากฝั่งผู้ใช้)
+      const plan = await planExamImport(questions as ParsedExamQuestion[], {
+        autoCategorize,
+        category,
+        categories: categoryNames,
+      });
+
+      const nextNumber = await loadNextQuestionNumbers(Array.from(new Set(plan.flat().map(t => t.category))));
+      const yearNum = year ? parseInt(year, 10) : null;
+
+      const rows: {
+        questionNumber: string;
+        title: string | null;
+        facts: string;
+        prompt: string;
+        officialAnswer: string;
+        examDate: string | null;
+        examYear: number | null;
+        category: string;
+        keyIssues: string;
+        relatedSections: string;
+        relatedDekas: string;
+      }[] = [];
+      let skippedDuplicates = 0;
+
+      (questions as ParsedExamQuestion[]).forEach((q, qi) => {
+        for (const target of plan[qi]) {
+          if (target.duplicate) {
+            skippedDuplicates++;
+            continue;
+          }
+          const num = nextNumber.get(target.category) ?? 1;
+          nextNumber.set(target.category, num + 1);
+          rows.push({
+            // เลขข้อกำหนดตามลำดับการนำเข้าในแต่ละหมวด ไม่ใช้เลขข้อในไฟล์
+            questionNumber: String(num),
+            title: q.title || null,
+            facts: q.facts,
+            prompt: q.prompt,
+            officialAnswer: q.officialAnswer,
+            examDate: q.examDate || null,
+            examYear: q.examYear || yearNum,
+            category: target.category,
+            keyIssues: JSON.stringify(q.keyIssues || []),
+            relatedSections: JSON.stringify(q.relatedSections || []),
+            relatedDekas: JSON.stringify(q.relatedDekas || []),
+          });
+        }
+      });
+
+      const perCategory: Record<string, number> = {};
+      for (const r of rows) perCategory[r.category] = (perCategory[r.category] || 0) + 1;
+
+      if (rows.length === 0) {
+        return NextResponse.json({
+          success: true,
+          imported: 0,
+          skippedDuplicates,
+          perCategory,
+          collection: null,
+        });
+      }
+
+      // หมวดของชุดข้อสอบ = หมวดที่มีข้อมากที่สุดในการนำเข้าครั้งนี้
+      const dominant = Object.entries(perCategory).sort((a, b) => b[1] - a[1])[0]?.[0] || UNCATEGORIZED_CATEGORY;
+
       const newCollection = await prisma.examCollection.create({
         data: {
           title,
-          category,
-          year: year ? parseInt(year, 10) : null,
+          category: dominant,
+          year: yearNum,
           description: description || null,
           source: source || 'เนติบัณฑิตยสภา',
-          questions: {
-            create: questions.map((q: ParsedExamQuestion) => ({
-              questionNumber: q.questionNumber,
-              title: q.title || null,
-              facts: q.facts,
-              prompt: q.prompt,
-              officialAnswer: q.officialAnswer,
-              examDate: q.examDate || null,
-              examYear: q.examYear || (year ? parseInt(year, 10) : null),
-              category: q.category || category,
-              keyIssues: JSON.stringify(q.keyIssues || []),
-              relatedSections: JSON.stringify(q.relatedSections || []),
-              relatedDekas: JSON.stringify(q.relatedDekas || []),
-            }))
-          }
+          questions: { create: rows },
         },
-        include: {
-          questions: true
-        }
       });
 
       return NextResponse.json({
         success: true,
-        collection: newCollection
+        imported: rows.length,
+        skippedDuplicates,
+        perCategory,
+        collection: { id: newCollection.id, title: newCollection.title },
       });
     }
 

@@ -9,6 +9,7 @@ import {
   Flame, Target, Zap
 } from 'lucide-react';
 import { useExamCategories } from '@/hooks/useExamCategories';
+import ExamCategoryMover from '@/components/ExamCategoryMover';
 import { 
   getExamStatistics, 
   getDueReviewItems, 
@@ -34,6 +35,20 @@ export default function ExamsCatalogPage() {
   const [totalQuestions, setTotalQuestions] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // แอดมินย้ายหมวดข้อสอบ: อัปเดตรายการและตัวนับหมวดในหน้าทันที
+  const handleQuestionMoved = (id: string, fromCategory: string, toCategory: string, questionNumber: string) => {
+    setQuestions((prev) =>
+      selectedCategory !== 'all' && selectedCategory !== toCategory
+        ? prev.filter((x) => x.id !== id)
+        : prev.map((x) => (x.id === id ? { ...x, category: toCategory, questionNumber } : x))
+    );
+    setCategoryStats((prev) => ({
+      ...prev,
+      [fromCategory]: Math.max(0, (prev[fromCategory] || 0) - 1),
+      [toCategory]: (prev[toCategory] || 0) + 1,
+    }));
+  };
 
   // Stats & SRS State
   const [stats, setStats] = useState({
@@ -416,8 +431,8 @@ export default function ExamsCatalogPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {questions.map((q) => (
+                  <div key={q.id} className="space-y-2">
                   <Link
-                    key={q.id}
                     href={`/exams/${q.id}`}
                     className="group bg-white rounded-2xl border border-slate-200 p-5 shadow-xs hover:shadow-md hover:border-indigo-400 transition-all flex flex-col justify-between space-y-4 cursor-pointer"
                   >
@@ -482,6 +497,12 @@ export default function ExamsCatalogPage() {
                       </span>
                     </div>
                   </Link>
+                  <ExamCategoryMover
+                    questionId={q.id}
+                    currentCategory={q.category}
+                    onMoved={({ category, questionNumber }) => handleQuestionMoved(q.id, q.category, category, questionNumber)}
+                  />
+                  </div>
                 ))}
               </div>
             </div>

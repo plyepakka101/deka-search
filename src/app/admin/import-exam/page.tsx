@@ -12,6 +12,7 @@ import { useExamCategories } from '@/hooks/useExamCategories';
 export default function ImportExamPage() {
   const examCategories = useExamCategories();
   const [category, setCategory] = useState<string>(DEFAULT_EXAM_CATEGORIES[5]); // Default: พ.ร.บ.ล้มละลาย
+  const [autoCategorize, setAutoCategorize] = useState(false);
   const [title, setTitle] = useState('');
   const [source, setSource] = useState('เนติบัณฑิตยสภา');
   const [year, setYear] = useState('');
@@ -56,6 +57,7 @@ export default function ImportExamPage() {
           action: 'preview',
           rawText,
           category,
+          autoCategorize,
           title,
           description,
           source
@@ -99,6 +101,7 @@ export default function ImportExamPage() {
           action: 'save',
           title: title || previewCollection.title,
           category,
+          autoCategorize,
           year: year ? parseInt(year, 10) : previewCollection.year,
           description,
           source,
@@ -111,7 +114,15 @@ export default function ImportExamPage() {
         throw new Error(data.error || 'การบันทึกข้อสอบล้มเหลว');
       }
 
-      setSuccessMessage(`บันทึกชุดข้อสอบ "${data.collection.title}" จำนวน ${previewCollection.questions.length} ข้อ เรียบร้อยแล้ว!`);
+      const dupText = data.skippedDuplicates > 0 ? ` (ข้ามข้อที่ซ้ำ ${data.skippedDuplicates} ข้อ)` : '';
+      const catText = Object.entries(data.perCategory || {})
+        .map(([cat, n]) => `${cat} ${n} ข้อ`)
+        .join(', ');
+      setSuccessMessage(
+        data.imported > 0
+          ? `นำเข้า ${data.imported} ข้อ เรียบร้อยแล้ว${dupText} — ${catText}`
+          : `ไม่มีข้อสอบใหม่ให้นำเข้า (ซ้ำทั้งหมด ${data.skippedDuplicates} ข้อ)`
+      );
       // Reset raw text and preview
       setRawText('');
       setPreviewCollection(null);
@@ -196,10 +207,29 @@ export default function ImportExamPage() {
                 หมวดกฎหมาย <span className="text-rose-500">*</span>
                 <Link href="/admin/exam-categories" className="ml-2 text-xs font-medium text-indigo-600 hover:underline">+ เพิ่ม/จัดการหมวด</Link>
               </label>
+              <label className="flex items-start gap-2 p-3 bg-indigo-50/60 border border-indigo-100 rounded-xl cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoCategorize}
+                  onChange={(e) => {
+                    setAutoCategorize(e.target.checked);
+                    setPreviewCollection(null);
+                  }}
+                  className="mt-0.5"
+                />
+                <span className="text-sm text-slate-700">
+                  <strong>จัดหมวดอัตโนมัติจากกฎหมายที่อ้างในข้อสอบ</strong>
+                  <span className="block text-xs text-slate-500 mt-0.5">
+                    ใช้กับไฟล์ที่รวมหลายกฎหมาย — ถ้าข้อหนึ่งอ้างหลายฉบับจะนำเข้าทุกหมวดที่เกี่ยวข้อง
+                    ถ้าตรวจไม่พบกฎหมายจะลงหมวด "อื่นๆ" ให้แอดมินตรวจและย้ายภายหลัง
+                  </span>
+                </span>
+              </label>
               <select
                 value={category}
+                disabled={autoCategorize}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-50"
               >
                 {examCategories.map((cat, idx) => (
                   <option key={cat} value={cat}>
@@ -301,7 +331,12 @@ export default function ImportExamPage() {
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   พบข้อสอบทั้งหมด <strong>{previewCollection.questionsCount} ข้อ</strong> | 
+                  จะนำเข้า <strong>{previewCollection.importCount} รายการ</strong>
+                  {previewCollection.duplicateCount > 0 && (
+                    <> (ข้ามข้อที่ซ้ำ <strong className="text-amber-600">{previewCollection.duplicateCount}</strong>)</>
+                  )} | 
                   ตรวจพบฎีกาตรงในฐานข้อมูล Turso <strong>{previewCollection.matchedDekasCount} คดี</strong>
+                  <span className="block mt-0.5 text-slate-400">เลขข้อจะกำหนดใหม่ตามลำดับการนำเข้าของแต่ละหมวด (ไม่ใช้เลขข้อในไฟล์)</span>
                 </p>
               </div>
 
@@ -331,6 +366,24 @@ export default function ImportExamPage() {
                       <span className="text-sm font-bold text-slate-800">
                         {q.title || `ข้อ ${q.questionNumber}`}
                       </span>
+                    </div>
+
+                    <div className="w-full flex flex-wrap gap-1.5 order-last">
+                      {(q.targets || []).map((t: { category: string; duplicate: boolean }) => (
+                        <span
+                          key={t.category}
+                          className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+                            t.duplicate
+                              ? 'bg-amber-50 text-amber-700 border-amber-200 line-through'
+                              : t.category === 'อื่นๆ'
+                                ? 'bg-slate-100 text-slate-600 border-slate-200'
+                                : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                          }`}
+                          title={t.duplicate ? 'ซ้ำกับข้อสอบที่มีอยู่แล้ว จะไม่นำเข้า' : 'หมวดที่จะนำเข้า'}
+                        >
+                          {t.category}{t.duplicate ? ' (ซ้ำ)' : ''}
+                        </span>
+                      ))}
                     </div>
 
                     <div className="flex items-center gap-2 text-xs">
