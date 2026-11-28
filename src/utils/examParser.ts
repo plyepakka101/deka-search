@@ -188,7 +188,8 @@ export function parseExamText(
   const questionSplits: { header: string; content: string }[] = [];
   
   // Regex matches start of question e.g. "7.1 ", "ข้อ 7.1", "คำถามข้อ 7\n7.1"
-  const regexQuestionStart = /(?:^|\n)(?:(?:คำถามข้อ\s*[0-9]+(?:\.[0-9]+)?)|(?:ข้อ\s*[0-9]+(?:\.[0-9]+)?)|(?:[0-9]+\.[0-9]+))\s+/g;
+  // รองรับบรรทัดที่มีย่อหน้านำหน้า (เว้นวรรค/แท็บ) และเลขข้อที่มีจุด/วงเล็บปิดต่อท้าย เช่น "ข้อ 1." "ข้อ 2)"
+  const regexQuestionStart = /(?:^|\n)[ \t\u00a0\u3000]*(?:(?:คำถามข้อ\s*[0-9]+(?:\.[0-9]+)?)|(?:ข้อ\s*[0-9]+(?:\.[0-9]+)?)|(?:[0-9]+\.[0-9]+))\s*[.):]?\s+/g;
   
   const matches: { index: number; text: string }[] = [];
   let m;
@@ -228,7 +229,7 @@ export function parseExamText(
     let answerPart = parts.length > 1 ? parts.slice(1).join('\nธงคำตอบ ').trim() : '';
 
     // Extract Question Number (e.g. "7.1", "7.2")
-    let qNum = item.header.replace(/^(?:คำถามข้อ|ข้อ)\s*/, '').trim();
+    let qNum = item.header.replace(/^(?:คำถามข้อ|ข้อ)\s*/, '').replace(/[.):]+$/, '').trim();
     const subNumMatch = chunk.match(/(?:^|\n)\s*([0-9]+\.[0-9]+)\s+/);
     if (subNumMatch) {
       qNum = subNumMatch[1];
@@ -270,7 +271,7 @@ export function parseExamText(
     facts = facts
       .replace(/^คำถามข้อ\s*[0-9]+(?:\.[0-9]+)?\s*/i, '')
       .replace(/^[0-9]+\.[0-9]+\s*/, '')
-      .replace(/^ข้อ\s*[0-9]+(?:\.[0-9]+)?\s*/i, '')
+      .replace(/^ข้อ\s*[0-9]+(?:\.[0-9]+)?\s*[.):]?\s*/i, '')
       .trim();
 
     // Citations & Issues

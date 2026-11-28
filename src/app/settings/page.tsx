@@ -876,6 +876,25 @@ export default function SettingsPage() {
               </Link>
 
               <Link
+                href="/admin/exam-imports"
+                className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-rose-500 dark:hover:border-rose-500 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-rose-50/30 dark:hover:bg-rose-950/20 transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-xl bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-400 group-hover:scale-105 transition-transform">
+                    <GraduationCap className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-rose-600 transition-colors">
+                      ประวัติการนำเข้าข้อสอบ
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      ดูและลบชุดข้อสอบที่นำเข้าผิดพลาด
+                    </div>
+                  </div>
+                </div>
+              </Link>
+
+              <Link
                 href="/admin/exam-categories"
                 className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-violet-500 dark:hover:border-violet-500 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-violet-50/30 dark:hover:bg-violet-950/20 transition-all group"
               >

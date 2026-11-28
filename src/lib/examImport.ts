@@ -41,7 +41,13 @@ export async function loadNextQuestionNumbers(categories: string[]): Promise<Map
  * คืนจำนวนข้อที่เลขเปลี่ยน
  */
 export async function renumberCategory(category: string): Promise<{ total: number; changed: number }> {
-  const rows = await prisma.examQuestion.findMany({
+  interface RenumberRow {
+    id: string;
+    questionNumber: string;
+    createdAt: Date;
+    collection: { createdAt: Date };
+  }
+  const rows: RenumberRow[] = await prisma.examQuestion.findMany({
     where: { category },
     select: {
       id: true,

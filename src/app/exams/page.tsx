@@ -50,6 +50,12 @@ export default function ExamsCatalogPage() {
     }));
   };
 
+  // แอดมินลบข้อสอบ: เอาออกจากรายการและลดตัวนับหมวด (เลขข้อของข้อที่เหลือจะเปลี่ยนเมื่อโหลดใหม่)
+  const handleQuestionDeleted = (id: string, category: string) => {
+    setQuestions((prev) => prev.filter((x) => x.id !== id));
+    setCategoryStats((prev) => ({ ...prev, [category]: Math.max(0, (prev[category] || 0) - 1) }));
+  };
+
   // Stats & SRS State
   const [stats, setStats] = useState({
     totalAttempts: 0,
@@ -501,6 +507,7 @@ export default function ExamsCatalogPage() {
                     questionId={q.id}
                     currentCategory={q.category}
                     onMoved={({ category, questionNumber }) => handleQuestionMoved(q.id, q.category, category, questionNumber)}
+                    onDeleted={() => handleQuestionDeleted(q.id, q.category)}
                   />
                   </div>
                 ))}
