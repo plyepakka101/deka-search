@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { getExamCategories } from '@/lib/examCategories';
-import { loadExistingFingerprints, loadNextQuestionNumbers } from '@/lib/examImport';
+import { loadExistingFingerprints, loadNextQuestionNumbers, renumberCategory } from '@/lib/examImport';
 import { examFingerprint } from '@/utils/examParser';
 
 const LIST_LIMIT = 200;
@@ -40,10 +40,9 @@ export async function GET(request: Request) {
     }),
   ]);
 
-  return NextResponse.json({
-    success: true,
-    total,
-    questions: rows.map((r) => ({
+  const questions = [];
+  for (const r of rows) {
+    questions.push({
       id: r.id,
       questionNumber: r.questionNumber,
       title: r.title,
@@ -51,8 +50,10 @@ export async function GET(request: Request) {
       prompt: r.prompt,
       examYear: r.examYear,
       collectionTitle: r.collection?.title || '',
-    })),
-  });
+    });
+  }
+
+  return NextResponse.json({ success: true, total, questions });
 }
 
 /** ย้ายข้อสอบไปหมวดอื่น: ได้เลขข้อต่อท้ายหมวดปลายทาง และไม่ย้ายถ้าหมวดปลายทางมีข้อเดียวกันอยู่แล้ว */
@@ -113,9 +114,16 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'ไม่พบรหัสข้อสอบ' }, { status: 400 });
   }
   try {
+    const existing = await prisma.examQuestion.findUnique({ where: { id }, select: { category: true } });
+    if (!existing) {
+      return NextResponse.json({ error: 'ไม่พบข้อสอบ' }, { status: 404 });
+    }
     await prisma.examQuestion.delete({ where: { id } });
+    // เรียงเลขข้อของหมวดนั้นใหม่ ไม่ให้เลขขาดช่วง
+    await renumberCategory(existing.category);
     return NextResponse.json({ success: true });
-  } catch {
-    return NextResponse.json({ error: 'ไม่พบข้อสอบ' }, { status: 404 });
+  } catch (error) {
+    console.error('Error deleting exam question:', error);
+    return NextResponse.json({ error: 'ไม่สามารถลบข้อสอบได้' }, { status: 500 });
   }
 }

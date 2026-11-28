@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { 
   ArrowLeft, Clock, Play, Pause, RotateCcw, CheckCircle2, 
   AlertCircle, Scale, BookOpen, ChevronRight, X, ExternalLink, 
@@ -20,6 +20,7 @@ import {
 
 export default function ExamRoomPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params?.id as string;
 
   const [question, setQuestion] = useState<any | null>(null);
@@ -327,6 +328,7 @@ export default function ExamRoomPage() {
         <ExamCategoryMover
           questionId={question.id}
           currentCategory={question.category}
+          onDeleted={() => router.push('/exams')}
           onMoved={({ category, questionNumber }) =>
             setQuestion((prev: any) => (prev ? { ...prev, category, questionNumber } : prev))
           }

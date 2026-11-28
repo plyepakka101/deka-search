@@ -206,6 +206,7 @@ export default function ImportExamPage() {
               <label className="text-sm font-semibold text-slate-700">
                 หมวดกฎหมาย <span className="text-rose-500">*</span>
                 <Link href="/admin/exam-categories" className="ml-2 text-xs font-medium text-indigo-600 hover:underline">+ เพิ่ม/จัดการหมวด</Link>
+                <Link href="/admin/exam-imports" className="ml-2 text-xs font-medium text-rose-600 hover:underline">ประวัติ/ลบชุดที่นำเข้า</Link>
               </label>
               <label className="flex items-start gap-2 p-3 bg-indigo-50/60 border border-indigo-100 rounded-xl cursor-pointer">
                 <input
