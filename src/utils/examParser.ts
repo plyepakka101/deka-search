@@ -160,6 +160,10 @@ export function extractKeyIssues(answer: string): string[] {
 /**
  * Main parser function: parses raw exam text into a collection of questions
  */
+/** บรรทัดที่ขึ้นต้นด้วย ธงคำตอบ / แนวคำตอบ / คำตอบ — ใช้ทั้งแยกคำถามออกจากธงคำตอบ และบอกว่าข้อนั้น "จบแล้ว" */
+const ANSWER_MARKER_REGEX = /(?:^|\n)\s*(?:ธงคำตอบ|แนวคำตอบ|คำตอบ)\s*[:\-—]?\s*/;
+const PROMPT_MARKER_REGEX = /ให้วินิจฉัยว่า/;
+
 export function parseExamText(
   rawText: string, 
   defaultCategory: string = "พระราชบัญญัติล้มละลาย พ.ศ. 2483",
@@ -189,7 +193,7 @@ export function parseExamText(
   
   // Regex matches start of question e.g. "7.1 ", "ข้อ 7.1", "คำถามข้อ 7\n7.1"
   // รองรับบรรทัดที่มีย่อหน้านำหน้า (เว้นวรรค/แท็บ) และเลขข้อที่มีจุด/วงเล็บปิดต่อท้าย เช่น "ข้อ 1." "ข้อ 2)"
-  const regexQuestionStart = /(?:^|\n)[ \t\u00a0\u3000]*(?:(?:คำถามข้อ\s*[0-9]+(?:\.[0-9]+)?)|(?:ข้อ\s*[0-9]+(?:\.[0-9]+)?)|(?:[0-9]+\.[0-9]+))\s*[.):]?\s+/g;
+  const regexQuestionStart = /(?:^|\n)[ \t\u00a0\u3000]*(?:(?:คำถาม(?:ข้อ\s*[0-9]+(?:\.[0-9]+)?)?)|(?:ข้อ\s*[0-9]+(?:\.[0-9]+)?)|(?:[0-9]+\.[0-9]+))\s*[.):]?\s+/g;
   
   const matches: { index: number; text: string }[] = [];
   let m;
@@ -198,14 +202,42 @@ export function parseExamText(
   }
 
   if (matches.length > 0) {
-    for (let i = 0; i < matches.length; i++) {
-      const startIdx = matches[i].index;
-      const endIdx = i + 1 < matches.length ? matches[i + 1].index : normalized.length;
-      const chunk = normalized.substring(startIdx, endIdx).trim();
-      questionSplits.push({
-        header: matches[i].text,
-        content: chunk
-      });
+    const chunks = matches.map((match, i) => ({
+      header: match.text,
+      content: normalized
+        .substring(match.index, i + 1 < matches.length ? matches[i + 1].index : normalized.length)
+        .trim(),
+    }));
+
+    if (!ANSWER_MARKER_REGEX.test(normalized)) {
+      // ไม่มี "ธงคำตอบ" เลย (ไฟล์มีแต่โจทย์) — ใช้เลขข้อ/คำว่า "คำถาม" เป็นตัวแบ่ง
+      questionSplits.push(...chunks);
+    } else {
+      // โครงสร้าง 1 ข้อ = โจทย์ → "ให้วินิจฉัยว่า" → "ธงคำตอบ" → (ข้อถัดไป)
+      // ข้อหนึ่งจบได้เฉพาะหลังผ่าน "ธงคำตอบ" แล้ว ข้อใหม่คือ "คำถาม"/เลขข้อแรกที่พบหลังจากนั้น
+      // เลขข้อ/ "ข้อ 1" "ข้อ 2" ที่โผล่ก่อนถึงธงคำตอบ ถือเป็นส่วนหนึ่งของโจทย์ ไม่ใช่ข้อใหม่
+      for (const chunk of chunks) {
+        const prev = questionSplits[questionSplits.length - 1];
+        if (prev && !ANSWER_MARKER_REGEX.test(prev.content)) {
+          prev.content += '\n' + chunk.content;
+        } else {
+          questionSplits.push({ ...chunk });
+        }
+      }
+
+      // กันเศษที่ไม่ใช่ข้อสอบจริง (ไม่มีทั้ง "ให้วินิจฉัยว่า" และ "ธงคำตอบ") — รวมกลับเข้าข้อก่อนหน้า
+      const validated: { header: string; content: string }[] = [];
+      for (const q of questionSplits) {
+        const looksLikeQuestion = ANSWER_MARKER_REGEX.test(q.content) || PROMPT_MARKER_REGEX.test(q.content);
+        const prev = validated[validated.length - 1];
+        if (!looksLikeQuestion && prev) {
+          prev.content += '\n' + q.content;
+        } else {
+          validated.push(q);
+        }
+      }
+      questionSplits.length = 0;
+      questionSplits.push(...validated);
     }
   } else {
     // If no numbered pattern found, treat the whole text as 1 question
@@ -222,8 +254,7 @@ export function parseExamText(
     const chunk = item.content;
     
     // Split into question vs answer using "ธงคำตอบ" or "แนวคำตอบ" or "คำตอบ"
-    const answerMarkerRegex = /(?:^|\n)\s*(?:ธงคำตอบ|แนวคำตอบ|คำตอบ)\s*[:\-—]?\s*/;
-    const parts = chunk.split(answerMarkerRegex);
+    const parts = chunk.split(ANSWER_MARKER_REGEX);
 
     let questionPart = parts[0]?.trim() || '';
     let answerPart = parts.length > 1 ? parts.slice(1).join('\nธงคำตอบ ').trim() : '';
@@ -269,7 +300,7 @@ export function parseExamText(
 
     // Clean up facts: remove leading headers e.g. "คำถามข้อ 7", "7.1"
     facts = facts
-      .replace(/^คำถามข้อ\s*[0-9]+(?:\.[0-9]+)?\s*/i, '')
+      .replace(/^คำถาม(?:ข้อ\s*[0-9]+(?:\.[0-9]+)?)?\s*[.):]?\s*/i, '')
       .replace(/^[0-9]+\.[0-9]+\s*/, '')
       .replace(/^ข้อ\s*[0-9]+(?:\.[0-9]+)?\s*[.):]?\s*/i, '')
       .trim();
